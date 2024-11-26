@@ -1,12 +1,10 @@
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import User
-from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+
 from config import settings
 from cloudinary.models import CloudinaryField
-from django.contrib.auth import get_user_model
+
 
 class Category(models.Model):
     label = models.CharField(max_length=200, unique=True)
@@ -53,7 +51,6 @@ class Color(models.Model):
 
 
 class Product(models.Model):
-
     title = models.CharField(max_length=255)
     image1 = CloudinaryField('image1')  # Используем CloudinaryField
     image2 = CloudinaryField('image2')
@@ -77,7 +74,11 @@ class Product(models.Model):
     def __str__(self):
         return self.title
 
-class Comment(models.Model):
+
+
+
+
+class Review(models.Model):
     RATING_CHOICES = [
         (1, '1 star'),
         (1.5, '1.5 star'),
@@ -90,18 +91,8 @@ class Comment(models.Model):
         (5, '5 star'),
     ]
 
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE,
-        related_name="comments",
-        verbose_name="Product"
-    )
-    user = models.ForeignKey(
-        get_user_model(),  # Используйте get_user_model() вместо auth.User
-        on_delete=models.CASCADE,
-        related_name="comments",
-        verbose_name="User"
-    )
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews", verbose_name="Product")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="User")
     comments = models.TextField(verbose_name="Comments", blank=True, null=True)
     rating = models.FloatField(
         choices=RATING_CHOICES,
@@ -115,7 +106,8 @@ class Comment(models.Model):
     updated = models.DateTimeField(auto_now=True, verbose_name="Date Updated")
 
     def __str__(self):
-        return f'Comment by {self.user} for {self.product} - Rating: {self.rating}'
+        return f'Review by {self.user} for {self.product} - Rating: {self.rating}'
+
 
 class Banner(models.Model):
     image = CloudinaryField('image')

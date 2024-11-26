@@ -20,26 +20,9 @@ from decimal import Decimal
 import logging
 from rest_framework.response import Response
 from rest_framework import generics
-from .models import Comment
-from rest_framework import viewsets
+from .models import Review
+from .serializers import ReviewSerializer
 from rest_framework.permissions import IsAuthenticated
-from .models import Comment
-from .serializers import *
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Comment
-from .serializers import CommentSerializer
-from rest_framework.permissions import IsAuthenticated
-
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .serializers import CommentSerializer
-from .models import Comment
 logger = logging.getLogger(__name__)
 class HomepageView(APIView):
     @swagger_auto_schema(
@@ -424,30 +407,69 @@ class ProductCreateView(generics.CreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class CommentCreateView(APIView):
+class ReviewCreateView(generics.CreateAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
 
-    def get(self, request):
-        product_id = request.query_params.get('product_id')
-        if product_id:
-            comments = Comment.objects.filter(user=request.user, product_id=product_id)
-            if not comments.exists():
-                return Response(
-                    {"detail": "No comments found for this product."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            comments = Comment.objects.filter(user=request.user)
-        serializer = CommentSerializer(comments, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        serializer = CommentSerializer(data=request.data)
-        if serializer.is_valid():
+    @swagger_auto_schema(
+        tags=['review'],
+        operation_description="Создать новый комментарий к продукту. Поле `user` берется из токена автоматически.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'product': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID продукта'),
+                'comments': openapi.Schema(type=openapi.TYPE_STRING, description='Комментарий'),
+                'rating': openapi.Schema(type=openapi.TYPE_NUMBER, description='Рейтинг (от 1 до 5)')
+            },
+            required=['product', 'rating']
+        ),
+        responses={
+            201: openapi.Response('Комментарий успешно создан', ReviewSerializer),
+            400: "Ошибка валидации данных",
+            401: "Аутентификация не выполнена",
+            404: "Продукт не найден"
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        # Устанавливаем пользователя из токена перед сохранением
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
             serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Product.DoesNotExist:
+            return Response({"detail": "Продукт не найден"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Просмотр, обновление и удаление комментария по ID.
+    """
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        tags=['review'],
+        operation_description="Получить, обновить или удалить комментарий по его ID.",
+        responses={
+            200: openapi.Response('Успешное получение данных', ReviewSerializer),
+            401: "Аутентификация не выполнена",
+            403: "Доступ запрещен",
+            404: "Комментарий не найден"
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        # Фильтруем комментарии: пользователь может редактировать/удалять только свои
+        return Review.objects.filter(user=self.request.user)
 
 
 class BannerDetailView(APIView):

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Avg
-from .models import Product, Category, Color, Brand,  Banner, Comment
+from .models import Product, Category, Color, Brand, Review, Banner
 from .utils import round_to_nearest_half
 from cloudinary.forms import CloudinaryFileField
 from django.conf import settings
@@ -268,12 +268,22 @@ class BrandSerializer(serializers.ModelSerializer):
         validated_data['value'] = translation.get(label, label).upper()
 
         return super().create(validated_data)
+
+class ReviewSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ['id', 'rating', 'comments']
+
+
+
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     color = ColorSerializer(read_only=True)
     brand = BrandSerializer(read_only=True)
+    reviews = ReviewSummarySerializer(many=True, read_only=True)
     avg_rating = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
+
 
     class Meta:
         model = Product
@@ -289,17 +299,17 @@ class ProductSerializer(serializers.ModelSerializer):
             'quantity',
             'description',
             'is_product_of_the_day',
-            'comment',  # Это поле скорее всего надо изменить, если оно использовало reviews
+            'reviews',
             'avg_rating',
             'is_active',
+
         ]
 
     def get_avg_rating(self, obj):
-        # Используем comments, а не reviews
-        if obj.comments.exists():  # Замените reviews на comments
-            avg_rating = obj.comments.aggregate(models.Avg('rating'))['rating__avg']
-            return avg_rating
-        return None
+        if obj.reviews.exists():
+            avg_rating = obj.reviews.aggregate(Avg('rating'))['rating__avg']
+            return round_to_nearest_half(avg_rating)
+        return 0
 
     def get_images(self, obj):
         request = self.context.get('request')
@@ -327,8 +337,8 @@ class ProductShortSerializer(serializers.ModelSerializer):
         ]
 
     def get_avg_rating(self, obj):
-        if obj.comments.exists():
-            avg_rating = obj.comments.aggregate(Avg('rating'))['rating__avg']
+        if obj.reviews.exists():
+            avg_rating = obj.reviews.aggregate(Avg('rating'))['rating__avg']
             return round_to_nearest_half(avg_rating)
         return 0
 
@@ -411,12 +421,48 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         return instance
 
-class CommentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = ['id', 'product', 'user', 'comments', 'rating', 'created', 'updated']
-        read_only_fields = ['user']  # user будет заполняться автоматически
 
+class ReviewSerializer(serializers.ModelSerializer):
+    product_title = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Review
+        fields = [
+            'id',
+            'product',
+            'product_title',
+            'user',
+            'user_name',
+            'comments',
+            'rating',
+            'created',
+            'updated'
+        ]
+
+    def get_product_title(self, obj):
+        """
+        Возвращает название продукта.
+        Если продукт отсутствует, возвращает 'unknown'.
+        """
+        return obj.product.title if obj.product else 'unknown'
+
+    def get_user_name(self, obj):
+        """
+        Возвращает имя пользователя.
+        Если пользователь отсутствует, возвращает 'unknown'.
+        """
+        return obj.user.username if obj.user else 'unknown'
+
+    def to_representation(self, instance):
+        """
+        Удаляет поля 'product' и 'user' из сериализованных данных,
+        оставляя только 'product_title' и 'user_name'.
+        """
+        representation = super().to_representation(instance)
+        representation.pop('product', None)
+        representation.pop('user', None)
+        return representation
 class BannerSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
