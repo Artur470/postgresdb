@@ -317,6 +317,8 @@ class ProductSerializer(serializers.ModelSerializer):
             obj.image1.url if obj.image1 else None,
             obj.image2.url if obj.image2 else None,
             obj.image3.url if obj.image3 else None,
+            obj.image4.url if obj.image4 else None,
+            obj.image5.url if obj.image5 else None,
         ]
         return [request.build_absolute_uri(image) for image in images if image] if request else images
 
@@ -346,8 +348,7 @@ class ProductShortSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         images = [
             obj.image1.url if obj.image1 else None,
-            obj.image2.url if obj.image2 else None,
-            obj.image3.url if obj.image3 else None,
+
         ]
         if request:
             return [request.build_absolute_uri(image) for image in images if image]
@@ -372,6 +373,8 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'image1',
             'image2',
             'image3',
+            'image4',
+            'image5',
             'price',
             'promotion',
             'brand',
@@ -391,12 +394,16 @@ class ProductCreateSerializer(serializers.ModelSerializer):
                 request.build_absolute_uri(instance.image1.url) if instance.image1 else None,
                 request.build_absolute_uri(instance.image2.url) if instance.image2 else None,
                 request.build_absolute_uri(instance.image3.url) if instance.image3 else None,
+                request.build_absolute_uri(instance.image4.url) if instance.image4 else None,
+                request.build_absolute_uri(instance.image5.url) if instance.image5 else None,
             ]
             representation['images'] = [image for image in images if image]
             # Удаляем поля image1, image2, image3 из вывода
             representation.pop('image1', None)
             representation.pop('image2', None)
             representation.pop('image3', None)
+            representation.pop('image4', None)
+            representation.pop('image5', None)
         return representation
 
     def create(self, validated_data):
@@ -423,46 +430,16 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    product_title = serializers.SerializerMethodField()
-    user_name = serializers.SerializerMethodField()
-
     class Meta:
         model = Review
-        fields = [
-            'id',
-            'product',
-            'product_title',
-            'user',
-            'user_name',
-            'comments',
-            'rating',
-            'created',
-            'updated'
-        ]
+        fields = ['product', 'comments', 'rating', 'created', 'updated']
 
-    def get_product_title(self, obj):
-        """
-        Возвращает название продукта.
-        Если продукт отсутствует, возвращает 'unknown'.
-        """
-        return obj.product.title if obj.product else 'unknown'
+    def create(self, validated_data):
+        # Добавляем текущего пользователя из запроса
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
 
-    def get_user_name(self, obj):
-        """
-        Возвращает имя пользователя.
-        Если пользователь отсутствует, возвращает 'unknown'.
-        """
-        return obj.user.username if obj.user else 'unknown'
 
-    def to_representation(self, instance):
-        """
-        Удаляет поля 'product' и 'user' из сериализованных данных,
-        оставляя только 'product_title' и 'user_name'.
-        """
-        representation = super().to_representation(instance)
-        representation.pop('product', None)
-        representation.pop('user', None)
-        return representation
 class BannerSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 

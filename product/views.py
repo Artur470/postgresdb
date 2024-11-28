@@ -20,9 +20,15 @@ from decimal import Decimal
 import logging
 from rest_framework.response import Response
 from rest_framework import generics
+from rest_framework.response import Response
+from rest_framework import status
 from .models import Review
 from .serializers import ReviewSerializer
 from rest_framework.permissions import IsAuthenticated
+from django.http import Http404
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
 logger = logging.getLogger(__name__)
 class HomepageView(APIView):
     @swagger_auto_schema(
@@ -406,11 +412,11 @@ class ProductCreateView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
-
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['review'],
@@ -420,45 +426,54 @@ class ReviewCreateView(generics.CreateAPIView):
             properties={
                 'product': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID продукта'),
                 'comments': openapi.Schema(type=openapi.TYPE_STRING, description='Комментарий'),
-                'rating': openapi.Schema(type=openapi.TYPE_NUMBER, description='Рейтинг (от 1 до 5)')
+                'rating': openapi.Schema(type=openapi.TYPE_NUMBER, description='Рейтинг (от 1 до 5)'),
             },
             required=['product', 'rating']
         ),
         responses={
-            201: openapi.Response('Комментарий успешно создан', ReviewSerializer),
+            201: openapi.Response(
+                description='Комментарий успешно создан',
+                examples={
+                    'application/json': {
+                        "id": 1,
+                        "product": 5,
+                        "comments": "Отличный продукт!",
+                        "rating": 4.5,
+                        "created": "2024-11-29T10:00:00Z",
+                        "updated": "2024-11-29T10:00:00Z"
+                    }
+                }
+            ),
             400: "Ошибка валидации данных",
-            401: "Аутентификация не выполнена",
-            404: "Продукт не найден"
+            401: "Аутентификация не выполнена"
         }
     )
+    def perform_create(self, serializer):
+        product = serializer.validated_data['product']
+        # Проверка: один пользователь - один отзыв на продукт
+        if Review.objects.filter(user=self.request.user, product=product).exists():
+            raise serializers.ValidationError("Вы уже оставили отзыв для этого продукта.")
+        serializer.save(user=self.request.user)
+
     def post(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return Response(
-                {"detail": "Authentication credentials were not provided."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        # Устанавливаем пользователя из токена перед сохранением
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            serializer.save(user=request.user)
-        except Product.DoesNotExist:
-            return Response({"detail": "Продукт не найден"}, status=status.HTTP_404_NOT_FOUND)
+        self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
 class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Просмотр, обновление и удаление комментария по ID.
-    """
+    permission_classes = [IsAuthenticated]
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-    permission_classes = [IsAuthenticated]
+
 
     @swagger_auto_schema(
         tags=['review'],
         operation_description="Получить, обновить или удалить комментарий по его ID.",
         responses={
             200: openapi.Response('Успешное получение данных', ReviewSerializer),
+            400: "Ошибка валидации данных",
             401: "Аутентификация не выполнена",
             403: "Доступ запрещен",
             404: "Комментарий не найден"
@@ -468,10 +483,13 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
-        # Фильтруем комментарии: пользователь может редактировать/удалять только свои
+        # Фильтруем, чтобы пользователь видел только свои отзывы
         return Review.objects.filter(user=self.request.user)
 
-
+    def handle_exception(self, exc):
+        if isinstance(exc, Http404):
+            return Response({"detail": "Комментарий не найден."}, status=status.HTTP_404_NOT_FOUND)
+        return super().handle_exception(exc)
 class BannerDetailView(APIView):
     def get(self, request, *args, **kwargs):
         banner = Banner.objects.first()

@@ -390,9 +390,7 @@ class GenderListCreateView(generics.ListCreateAPIView):
         operation_description="Этот эндпоинт позволяет создать новый пол."
     )
     def post(self, request, *args, **kwargs):
-        """
-        Создание нового пола
-        """
+
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()  # Сохраняем новый пол

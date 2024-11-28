@@ -12,10 +12,11 @@ from .serializers import CartItemsSerializer, OrderSerializer
 from django.db.models import Sum, F
 from .serializers import CartItemsSerializer, OrderSerializer
 from decimal import Decimal
-
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class CartView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['cart'],
