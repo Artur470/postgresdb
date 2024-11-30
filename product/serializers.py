@@ -170,6 +170,7 @@ class ColorSerializer(serializers.ModelSerializer):
         validated_data['value'] = translation.get(label, label)
 
         return super().create(validated_data)
+
 class BrandSerializer(serializers.ModelSerializer):
     value = serializers.SerializerMethodField()
 

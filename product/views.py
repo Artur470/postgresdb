@@ -1,24 +1,16 @@
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.pagination import PageNumberPagination
-from rest_framework import generics
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from drf_yasg.utils import swagger_auto_schema
 from .pagination import CustomPagination
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
 from product.serializers import *
 from django.db.models import Count, Avg
 from product.models import *
-from rest_framework.permissions import IsAuthenticated
 from .filters import ProductFilter
 from drf_yasg import openapi
 from django.db.models import Q
 from decimal import Decimal
 import logging
-from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
@@ -27,9 +19,33 @@ from .serializers import ReviewSerializer
 from rest_framework.permissions import IsAuthenticated
 from django.http import Http404
 from rest_framework_simplejwt.authentication import JWTAuthentication
+import logging
+from decimal import Decimal
 
+from django.db.models import Count, Avg
+from django.db.models import Q
+from django.http import Http404
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import generics
+from rest_framework import status
+from rest_framework.filters import SearchFilter
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+from product.models import *
+from product.serializers import *
+from .filters import ProductFilter
+from .models import Review
+from .pagination import CustomPagination
+from .serializers import ReviewSerializer
 
 logger = logging.getLogger(__name__)
+
+
 class HomepageView(APIView):
     @swagger_auto_schema(
         tags=['product'],
@@ -81,6 +97,7 @@ class HomepageView(APIView):
     def serialize_products(self, products):
         serializer = ProductShortSerializer(products, many=True)
         return serializer.data
+
 
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
@@ -236,13 +253,6 @@ class ProductListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-    @swagger_auto_schema(
-        tags=['product'],
-        operation_description="Этот эндпоинт позволяет создать новый продукт."
-    )
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
-
     def get_queryset(self):
         queryset = super().get_queryset()
 
@@ -332,6 +342,8 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+
 class ProductNewView(generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductShortSerializer
@@ -412,6 +424,7 @@ class ProductCreateView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
+
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
@@ -490,6 +503,7 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
         if isinstance(exc, Http404):
             return Response({"detail": "Комментарий не найден."}, status=status.HTTP_404_NOT_FOUND)
         return super().handle_exception(exc)
+
 class BannerDetailView(APIView):
     def get(self, request, *args, **kwargs):
         banner = Banner.objects.first()
@@ -497,3 +511,22 @@ class BannerDetailView(APIView):
             serializer = BannerSerializer(banner)
             return Response(serializer.data)
         return Response({"detail": "Banner not found"}, status=404)
+
+
+class ProductArchiveListView(generics.ListAPIView):
+    queryset = Product.objects.filter(is_active=False).order_by('id')
+    serializer_class = ProductShortSerializer
+
+    @swagger_auto_schema(
+        tags=['product'],
+        operation_description="Этот эндпоинт позволяет получить список всех товаров в архиве."
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        return queryset
+
+

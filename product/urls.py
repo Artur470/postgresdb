@@ -24,5 +24,7 @@ urlpatterns = [
     path('comment/<int:pk>/', ReviewDetailView.as_view(), name='review-detail'),
     # Маршрут для детального просмотра отзыва
     path('banner/', BannerDetailView.as_view(), name='banner-detail'),
+    path('archive/', ProductArchiveListView.as_view(), name='product-archive-list'),
+
 
 ]
