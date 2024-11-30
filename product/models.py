@@ -57,26 +57,28 @@ class Product(models.Model):
     image3 = CloudinaryField('image3')
     image4 = CloudinaryField('image4')
     image5 = CloudinaryField('image5')
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products', )
-    color = models.ForeignKey(Color, on_delete=models.CASCADE, )
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
+    color = models.ForeignKey(Color, on_delete=models.CASCADE)
+    wholesaler_price = models.DecimalField(max_digits=10, decimal_places=2)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     promotion = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products', )
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
     quantity = models.IntegerField()
     description = models.TextField(max_length=2551)
     is_product_of_the_day = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-
+    features = models.JSONField(default=list, blank=True)  # Поле для характеристик
 
     def save(self, *args, **kwargs):
         if self.quantity == 0:
             self.is_active = False
+        # Проверка на ограничение по количеству характеристик
+        if len(self.features) > 4:
+            raise ValidationError("Нельзя добавлять более 4 характеристик.")
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.title} ({self.id})"
-
-
 class Review(models.Model):
     RATING_CHOICES = [
         (1, '1 star'),

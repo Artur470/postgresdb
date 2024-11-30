@@ -276,15 +276,10 @@ class ReviewSummarySerializer(serializers.ModelSerializer):
         fields = ['id', 'rating', 'comments']
 
 
-
 class ProductSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
-    color = ColorSerializer(read_only=True)
-    brand = BrandSerializer(read_only=True)
-    reviews = ReviewSummarySerializer(many=True, read_only=True)
-    avg_rating = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
-
+    avg_rating = serializers.SerializerMethodField()
+    features = serializers.JSONField()  # Добавляем поле для характеристик
 
     class Meta:
         model = Product
@@ -303,16 +298,22 @@ class ProductSerializer(serializers.ModelSerializer):
             'reviews',
             'avg_rating',
             'is_active',
-
+            'features',  # Добавляем в список полей
         ]
 
     def get_avg_rating(self, obj):
+        """
+        Получение среднего рейтинга товара, если есть отзывы.
+        """
         if obj.reviews.exists():
             avg_rating = obj.reviews.aggregate(Avg('rating'))['rating__avg']
-            return round_to_nearest_half(avg_rating)
+            return round(avg_rating, 1) if avg_rating else 0
         return 0
 
     def get_images(self, obj):
+        """
+        Получение списка URL изображений товара.
+        """
         request = self.context.get('request')
         images = [
             obj.image1.url if obj.image1 else None,
@@ -323,7 +324,26 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
         return [request.build_absolute_uri(image) for image in images if image] if request else images
 
+    def validate_features(self, value):
+        """
+        Проверка количества характеристик.
+        """
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Характеристики должны быть списком.")
 
+        if len(value) > 4:
+            raise serializers.ValidationError("Нельзя добавлять более 4 характеристик.")
+
+        for feature in value:
+            if not isinstance(feature, dict):
+                raise serializers.ValidationError("Каждая характеристика должна быть объектом (ключ: значение).")
+            if 'key' not in feature or 'value' not in feature:
+                raise serializers.ValidationError("Каждая характеристика должна содержать ключ и значение.")
+
+            if not isinstance(feature['key'], str) or not isinstance(feature['value'], str):
+                raise serializers.ValidationError("Ключ и значение характеристики должны быть строками.")
+
+        return value
 class ProductShortSerializer(serializers.ModelSerializer):
     avg_rating = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
@@ -355,11 +375,6 @@ class ProductShortSerializer(serializers.ModelSerializer):
             return [request.build_absolute_uri(image) for image in images if image]
         return [image for image in images if image]
 
-# class ProductCharacteristicSerializer(serializers.ModelSerializer):
-#      class Meta:
-#             model = ProductCharacteristic
-#             fields = ['key', 'value']
-#
 
 class ProductCreateSerializer(serializers.ModelSerializer):
     # characteristics = ProductCharacteristicSerializer(many=True, required=False)

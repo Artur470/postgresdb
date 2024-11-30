@@ -14,8 +14,8 @@ from django.dispatch import receiver
 class Cart(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ordered = models.BooleanField(default=False)
-    total_price = models.FloatField(default=0)  # Итоговая сумма с учетом скидок
-    subtotal = models.FloatField(default=0)  # Подытог без учета скидок
+    total_price = models.FloatField(default=0)
+    subtotal = models.FloatField(default=0)
 
     def __str__(self):
         return f"Cart for {self.user}"
