@@ -52,11 +52,11 @@ class Color(models.Model):
 
 class Product(models.Model):
     title = models.CharField(max_length=255)
-    image1 = CloudinaryField('image1', null=True, blank=True)
-    image2 = CloudinaryField('image2', null=True, blank=True)
-    image3 = CloudinaryField('image3', null=True, blank=True)
-    image4 = CloudinaryField('image4', null=True, blank=True)
-    image5 = CloudinaryField('image5', null=True, blank=True)
+    image1 = CloudinaryField('image1')
+    image2 = CloudinaryField('image2')
+    image3 = CloudinaryField('image3')
+    image4 = CloudinaryField('image4')
+    image5 = CloudinaryField('image5')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     color = models.ForeignKey(Color, on_delete=models.CASCADE)
     wholesaler_price = models.DecimalField(max_digits=10, decimal_places=2)
