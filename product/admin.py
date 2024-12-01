@@ -35,7 +35,7 @@ class ProductAdmin(admin.ModelAdmin):
         'brand',
         'quantity',
         'description',
-        'features',  # Поле для характеристик
+        'main_characteristics',
         'is_product_of_the_day',
         'is_active',
     )

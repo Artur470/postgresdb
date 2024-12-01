@@ -52,11 +52,11 @@ class Color(models.Model):
 
 class Product(models.Model):
     title = models.CharField(max_length=255)
-    image1 = CloudinaryField('image1')
-    image2 = CloudinaryField('image2')
-    image3 = CloudinaryField('image3')
-    image4 = CloudinaryField('image4')
-    image5 = CloudinaryField('image5')
+    image1 = CloudinaryField('image1', null=True, blank=True)
+    image2 = CloudinaryField('image2', null=True, blank=True)
+    image3 = CloudinaryField('image3', null=True, blank=True)
+    image4 = CloudinaryField('image4', null=True, blank=True)
+    image5 = CloudinaryField('image5', null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     color = models.ForeignKey(Color, on_delete=models.CASCADE)
     wholesaler_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -67,13 +67,12 @@ class Product(models.Model):
     description = models.TextField(max_length=2551)
     is_product_of_the_day = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    features = models.JSONField(default=list, blank=True)  # Поле для характеристик
-
+    main_characteristics = models.JSONField(default=list)
     def save(self, *args, **kwargs):
         if self.quantity == 0:
             self.is_active = False
         # Проверка на ограничение по количеству характеристик
-        if len(self.features) > 4:
+        if len(self.main_characteristics) > 4:
             raise ValidationError("Нельзя добавлять более 4 характеристик.")
         super().save(*args, **kwargs)
 
