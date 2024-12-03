@@ -317,6 +317,10 @@ class ProductSerializer(serializers.ModelSerializer):
         return [request.build_absolute_uri(image) for image in images if image] if request else images
 
     def validate_main_characteristics(self, value):
+        # Если значение None, преобразуем его в пустой список
+        if value is None:
+            value = []
+
         if not isinstance(value, list):
             raise serializers.ValidationError("Характеристики должны быть списком.")
 
@@ -328,10 +332,15 @@ class ProductSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Каждая характеристика должна быть объектом (ключ: значение).")
             if 'key' not in characteristic or 'value' not in characteristic:
                 raise serializers.ValidationError("Каждая характеристика должна содержать ключ и значение.")
-            if not isinstance(characteristic['key'], str) or not isinstance(characteristic['value'], str):
-                raise serializers.ValidationError("Ключ и значение характеристики должны быть строками.")
+            if not isinstance(characteristic['key'], str):
+                raise serializers.ValidationError("Ключ характеристики должен быть строкой.")
+            if not isinstance(characteristic['value'], str) and not isinstance(characteristic['value'], (int, float)):
+                raise serializers.ValidationError(
+                    "Значение характеристики должно быть строкой, числом или числом с плавающей точкой.")
 
         return value
+
+
 class ProductShortSerializer(serializers.ModelSerializer):
     avg_rating = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()

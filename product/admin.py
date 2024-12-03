@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import Category, Product, Banner, Color
-from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.forms import JSONField, ModelForm
 from .models import Product
@@ -9,13 +8,19 @@ class ProductAdminForm(ModelForm):
     """
     Форма для модели Product с проверкой количества характеристик.
     """
-    features = JSONField(required=False, help_text="Добавьте характеристики в формате JSON (не более 4).")
+    main_characteristics = JSONField(required=False, help_text="Добавьте характеристики в формате JSON (не более 4).")
 
-    def clean_features(self):
-        features = self.cleaned_data.get('features', [])
-        if len(features) > 4:
+    def clean_main_characteristics(self):
+        main_characteristics = self.cleaned_data.get('main_characteristics', [])
+
+        # Если main_characteristics не является списком, присваиваем пустой список
+        if not isinstance(main_characteristics, list):
+            main_characteristics = []
+
+        if len(main_characteristics) > 4:
             raise ValidationError("Нельзя добавлять более 4 характеристик для одного товара.")
-        return features
+        return main_characteristics
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -35,7 +40,7 @@ class ProductAdmin(admin.ModelAdmin):
         'brand',
         'quantity',
         'description',
-        'main_characteristics',
+        'main_characteristics',  # Используем новое поле
         'is_product_of_the_day',
         'is_active',
     )
@@ -46,10 +51,10 @@ class ProductAdmin(admin.ModelAdmin):
         """
         Проверка при сохранении из админки.
         """
-        if len(obj.features) > 4:
+        if len(obj.main_characteristics) > 4:
             raise ValidationError("Нельзя добавлять более 4 характеристик для одного товара.")
         super().save_model(request, obj, form, change)
+
 admin.site.register(Category)
 admin.site.register(Banner)
 admin.site.register(Color)
-

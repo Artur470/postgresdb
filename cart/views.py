@@ -204,11 +204,10 @@ class CartView(APIView):
         product_id = request.data.get('id')
         new_quantity = int(request.data.get('quantity', 1))
 
-        # Проверка на наличие данных
+
         if new_quantity <= 0:
             return Response({'error': 'Invalid quantity'}, status=400)
 
-        # Получаем товар в корзине
         try:
             cart_item = get_object_or_404(CartItem, cart__user=request.user, product__id=product_id)
         except NotFound:
@@ -218,17 +217,17 @@ class CartView(APIView):
         if new_quantity > cart_item.product.quantity:
             return Response({'error': 'Not enough stock'}, status=400)
 
-        # Рассчитываем цену товара с учетом скидки
+
         product = cart_item.product
         price = product.price * (1 - (Decimal(product.promotion or 0) / Decimal(100)))
 
-        # Обновляем количество товара и пересчитываем цену
+
         cart_item.quantity = new_quantity
-        cart_item.price = price * Decimal(new_quantity)  # Пересчитываем цену на основе нового количества
+        cart_item.price = price * Decimal(new_quantity)
         cart_item.save()
 
         # Пересчитываем общую стоимость корзины
-        self.update_cart_totals(cart_item.cart)  # Убедитесь, что этот метод определен и обновляет корзину
+        self.update_cart_totals(cart_item.cart)
 
         return Response({
             'items': CartItemsSerializer(cart_item.cart.items.all(), many=True).data,
