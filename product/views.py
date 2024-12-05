@@ -15,7 +15,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Review
-from .serializers import ReviewSerializer
+from .serializers import ReviewCreateSerializer, ReviewSummarySerializer
 from rest_framework.permissions import IsAuthenticated
 from django.http import Http404
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -41,7 +41,7 @@ from product.serializers import *
 from .filters import ProductFilter
 from .models import Review
 from .pagination import CustomPagination
-from .serializers import ReviewSerializer
+from .serializers import ReviewSummarySerializer, ReviewCreateSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -262,31 +262,31 @@ class ProductListView(generics.ListAPIView):
         color_value = self.request.query_params.get('color', '').strip()
         search_value = self.request.query_params.get('search', '').strip()
 
-        # Инициализируем Q-объекты для комбинирования фильтров
+
         filters = Q()
 
-        # Фильтрация по существующим категориям
+
         if category_value:
             if Category.objects.filter(value__iexact=category_value).exists():
                 filters &= Q(category__value__iexact=category_value)
 
-        # Фильтрация по существующим брендам
+
         if brand_value:
             if Brand.objects.filter(value__iexact=brand_value).exists():
                 filters &= Q(brand__value__iexact=brand_value)
 
-        # Фильтрация по существующим цветам
+
         if color_value:
             if Color.objects.filter(value__iexact=color_value).exists():
                 filters &= Q(color__value__iexact=color_value)
 
-        # Если есть параметр поиска, добавляем его в фильтры
+
         if search_value:
             filters &= Q(title__icontains=search_value) | Q(description__icontains=search_value) | \
                        Q(price__icontains=search_value) | Q(promotion__icontains=search_value) | \
                        Q(category__label__icontains=search_value)
 
-        # Применяем комбинированные фильтры к queryset
+
         queryset = queryset.filter(filters)
 
         return queryset
@@ -303,11 +303,11 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
                               "схожесть выбирается по категории и по цене товара."
     )
     def get_similar_products(self, product):
-        # Преобразуем цену в Decimal для точных арифметических операций
+
         price = Decimal(product.price)
         price_range = Decimal('0.2') * price
 
-        # Запрос для получения похожих товаров
+
         similar_products = Product.objects.filter(
             category=product.category
         ).exclude(id=product.id).filter(
@@ -430,9 +430,12 @@ class ProductCreateView(generics.CreateAPIView):
         }
         # Вызываем родительский метод с контекстом
         return super().post(request, *args, **kwargs)
+
+
+
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
+    serializer_class = ReviewCreateSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
@@ -483,14 +486,14 @@ class ReviewCreateView(generics.CreateAPIView):
 class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-
+    serializer_class = ReviewCreateSerializer
+    authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['review'],
         operation_description="Получить, обновить или удалить комментарий по его ID.",
         responses={
-            200: openapi.Response('Успешное получение данных', ReviewSerializer),
+            200: openapi.Response('Успешное получение данных', ReviewCreateSerializer),
             400: "Ошибка валидации данных",
             401: "Аутентификация не выполнена",
             403: "Доступ запрещен",

@@ -273,12 +273,13 @@ class BrandSerializer(serializers.ModelSerializer):
 class ReviewSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
-        fields = ['id', 'rating', 'comments']
+        fields = ['rating', 'comments','created']
 
 class ProductSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
     avg_rating = serializers.SerializerMethodField()
     main_characteristics = serializers.JSONField()
+    reviews = ReviewSummarySerializer(many=True, read_only=True)
     class Meta:
         model = Product
         fields = [
@@ -293,8 +294,8 @@ class ProductSerializer(serializers.ModelSerializer):
             'quantity',
             'description',
             'is_product_of_the_day',
-            'reviews',
             'avg_rating',
+            'reviews',
             'is_active',
             'main_characteristics',
         ]
@@ -465,10 +466,12 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         return instance
 
 
-class ReviewSerializer(serializers.ModelSerializer):
+class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
-        fields = ['product', 'comments', 'rating', 'created', 'updated']
+        fields = ['product','rating','comments','created','updated']
+
+
 
     def create(self, validated_data):
         # Добавляем текущего пользователя из запроса
