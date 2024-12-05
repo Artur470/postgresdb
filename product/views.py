@@ -239,8 +239,6 @@ class ColorDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ProductListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
     queryset = Product.objects.filter(is_active=True).order_by('id')
     serializer_class = ProductShortSerializer
     pagination_class = CustomPagination
@@ -297,8 +295,7 @@ class ProductListView(generics.ListAPIView):
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+
     @swagger_auto_schema(
         tags=['product'],
         operation_description="Этот эндпоинт позволяет посмотреть похожие товары, "
