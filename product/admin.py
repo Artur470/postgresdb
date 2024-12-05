@@ -37,6 +37,8 @@ class ProductAdmin(admin.ModelAdmin):
         'color',
         'price',
         'promotion',
+        'wholesale_price',
+        'wholesale_promotion',
         'brand',
         'quantity',
         'description',

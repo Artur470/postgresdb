@@ -21,7 +21,7 @@ from django.http import Http404
 from rest_framework_simplejwt.authentication import JWTAuthentication
 import logging
 from decimal import Decimal
-
+from rest_framework.permissions import IsAdminUser
 from django.db.models import Count, Avg
 from django.db.models import Q
 from django.http import Http404
@@ -239,6 +239,8 @@ class ColorDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ProductListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     queryset = Product.objects.filter(is_active=True).order_by('id')
     serializer_class = ProductShortSerializer
     pagination_class = CustomPagination
@@ -295,7 +297,8 @@ class ProductListView(generics.ListAPIView):
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     @swagger_auto_schema(
         tags=['product'],
         operation_description="Этот эндпоинт позволяет посмотреть похожие товары, "
@@ -416,15 +419,20 @@ class ProductPopularView(generics.ListAPIView):
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductCreateSerializer
+    permission_classes = [IsAdminUser]
 
     @swagger_auto_schema(
         tags=['product'],
         operation_description="Этот эндпоинт позволяет создать новый продукт."
     )
     def post(self, request, *args, **kwargs):
+        # Добавляем пользователя в контекст сериализатора, а не в request.data
+        serializer_context = {
+            'request': request,
+            'user': request.user  # Передаем текущего пользователя в контекст
+        }
+        # Вызываем родительский метод с контекстом
         return super().post(request, *args, **kwargs)
-
-
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer

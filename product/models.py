@@ -49,7 +49,6 @@ class Color(models.Model):
     def __str__(self):
         return self.label
 
-
 class Product(models.Model):
     title = models.CharField(max_length=255)
     image1 = CloudinaryField('image1')
@@ -59,15 +58,17 @@ class Product(models.Model):
     image5 = CloudinaryField('image5')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     color = models.ForeignKey(Color, on_delete=models.CASCADE)
-    wholesaler_price = models.DecimalField(max_digits=10, decimal_places=2)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    promotion = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)  # Цена для обычных клиентов
+    promotion = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Акционная цена для обычных клиентов
+    wholesale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Цена для оптовиков
+    wholesale_promotion = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Акционная цена для оптовиков
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
     quantity = models.IntegerField()
     description = models.TextField(max_length=2551)
     is_product_of_the_day = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     main_characteristics = models.JSONField(default=list)
+
     def save(self, *args, **kwargs):
         if self.quantity == 0:
             self.is_active = False
@@ -78,6 +79,7 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.id})"
+
 class Review(models.Model):
     RATING_CHOICES = [
         (1, '1 star'),

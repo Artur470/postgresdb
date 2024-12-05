@@ -372,9 +372,9 @@ class ProductShortSerializer(serializers.ModelSerializer):
             return [request.build_absolute_uri(image) for image in images if image]
         return [image for image in images if image]
 
-
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField()
+    characteristics = serializers.JSONField(required=False)  # Если у вас есть поле для характеристик
 
     class Meta:
         model = Product
@@ -390,41 +390,53 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'image5',
             'price',
             'promotion',
+            'wholesale_price',
+            'wholesale_promotion',
             'brand',
             'quantity',
             'description',
             'is_product_of_the_day',
             'is_active',
-            'main_characteristics'
+            'main_characteristics',
+            'characteristics',  # Добавлено поле для характеристик
         ]
 
     def to_representation(self, instance):
-        """Переопределение вывода данных."""
+        """Переопределение вывода данных для пользователей, учитывая их роль."""
         representation = super().to_representation(instance)
         request = self.context.get('request')
-        if request:
-            images = [
-                request.build_absolute_uri(instance.image1.url) if instance.image1 else None,
-                request.build_absolute_uri(instance.image2.url) if instance.image2 else None,
-                request.build_absolute_uri(instance.image3.url) if instance.image3 else None,
-                request.build_absolute_uri(instance.image4.url) if instance.image4 else None,
-                request.build_absolute_uri(instance.image5.url) if instance.image5 else None,
-            ]
-            representation['images'] = [image for image in images if image]
-            # Удаляем поля image1, image2, image3 из вывода
-            representation.pop('image1', None)
-            representation.pop('image2', None)
-            representation.pop('image3', None)
-            representation.pop('image4', None)
-            representation.pop('image5', None)
+
+        if request and request.user.is_authenticated:
+            user = request.user
+            if user.role == 'wholesaler':  # Если роль оптовика
+                representation['price'] = instance.wholesale_price
+                representation['promotion'] = instance.wholesale_promotion
+            else:  # Если обычный клиент
+                representation['price'] = instance.price
+                representation['promotion'] = instance.promotion
+
         return representation
 
     def create(self, validated_data):
         """Создание продукта с характеристиками."""
         characteristics_data = validated_data.pop('characteristics', [])
         product = Product.objects.create(**validated_data)
+
+        # Получаем текущего пользователя из контекста
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            if user.role == 'wholesaler':  # Если роль оптовика
+                product.price = product.wholesale_price
+                product.promotion = product.wholesale_promotion
+
+        # Сохранение объекта продукта
+        product.save()
+
+        # Создание характеристик продукта
         for char_data in characteristics_data:
             ProductCharacteristic.objects.create(product=product, **char_data)
+
         return product
 
     def update(self, instance, validated_data):
@@ -432,10 +444,21 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('characteristics', [])
         instance = super().update(instance, validated_data)
 
+        # Получаем текущего пользователя из контекста
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            if user.role == 'wholesaler':  # Если роль оптовика
+                instance.price = instance.wholesale_price
+                instance.promotion = instance.wholesale_promotion
+
+        # Сохраняем обновленный продукт
+        instance.save()
+
         # Удаляем старые характеристики
         instance.characteristics.all().delete()
 
-        # Создаём новые характеристики
+        # Создаем новые характеристики
         for char_data in characteristics_data:
             ProductCharacteristic.objects.create(product=instance, **char_data)
 

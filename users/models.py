@@ -32,6 +32,9 @@ class Gender(models.Model):
 
     def __str__(self):
         return self.label
+
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     USER_ROLE_CHOICES = [
         ('admin', 'Admin'),
