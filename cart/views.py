@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.http import Http404
 from django.db.models import F, ExpressionWrapper, FloatField
 from .models import Cart, CartItem, Order, PaymentMethod
 from product.models import Product
@@ -53,20 +54,28 @@ class CartView(APIView):
             ),
         },
     )
+
+
+
     def get(self, request):
         user = request.user
+        # Проверка роли через поле `role` у пользователя
+        is_wholesale = user.role == 'wholesaler'  # Проверка, является ли пользователь оптовиком
+
+        # Получаем корзину пользователя
         cart = Cart.objects.filter(user=user, ordered=False).first()
 
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
 
-        # Получаем товары в корзине
-        queryset = CartItem.objects.filter(cart=cart)
+        # Получаем товары в корзине и оптимизируем запросы
+        queryset = CartItem.objects.filter(cart=cart).select_related('product')
 
         # Переменные для подсчета
-        total_quantity = 0
+        total_quantity = sum(item.quantity for item in queryset)
         subtotal = Decimal(0)  # Общая сумма без скидки
         total_price = Decimal(0)  # Итоговая стоимость с учетом скидки
+        item_data_list = []  # Список для хранения данных о каждом товаре
 
         # Обрабатываем каждый элемент корзины
         for item in queryset:
@@ -74,33 +83,43 @@ class CartView(APIView):
             product_price = Decimal(product.price)  # Обычная цена товара
             product_promotion = product.promotion  # Скидка товара, если есть
 
+            # Если пользователь оптовик, используем оптовую цену и скидку
+            if is_wholesale:
+                product_price = Decimal(product.wholesale_price)  # Оптовая цена
+                product_promotion = product.wholesale_promotion  # Оптовая скидка
+
             # Рассчитываем цену с учетом скидки
             if product_promotion:
-                discounted_price = Decimal(product.promotion)  # Цена товара с учетом скидки
+                discounted_price = Decimal(product_promotion)  # Цена товара с учетом скидки
+                price_to_return = discounted_price  # Цена с учетом скидки
             else:
                 discounted_price = product_price  # Если скидки нет, используем обычную цену
+                price_to_return = product_price  # Цена без скидки
 
             # Обновляем итоговые значения
-            total_quantity += item.quantity
             subtotal += product_price * item.quantity  # Сумма без скидки
             total_price += discounted_price * item.quantity  # Итоговая сумма с учетом скидки
 
-        # Сохраняем обновленные значения корзины
-        cart.total_quantity = total_quantity
-        cart.subtotal = subtotal
-        cart.total_price = total_price
-        cart.save()
+            # Включаем цену с учетом скидки в сериализатор
+            item_data = {
+                'cart_id': cart.id,
+                'product_id': product.id,
+                'title': product.title,
+                'image': product.image1.url if product.image1 else None,
+                # Используйте image1 или другое поле изображения
+                'quantity': item.quantity,
+                'price': int(price_to_return),  # Преобразуем цену в float для JSON
+            }
+            item_data_list.append(item_data)
 
         # Сериализуем товары для ответа
-        serializer = CartItemsSerializer(queryset, many=True)
-
-        # Формируем ответ
         return Response({
-            'items': serializer.data,
+            'items': item_data_list,
             'total_quantity': total_quantity,
-            'subtotal': float(subtotal),  # Преобразуем Decimal в float для JSON ответа
-            'totalPrice': float(total_price),
+            'subtotal': int(subtotal),  # Преобразуем Decimal в float для JSON ответа
+            'totalPrice': int(total_price),
         })
+
     def post(self, request):
         data = request.data
         user = request.user
@@ -200,42 +219,107 @@ class CartView(APIView):
         }
     )
     def put(self, request):
+        """
+        Обновление количества товара в корзине.
+        """
         # Получаем ID товара и новое количество из данных запроса
         product_id = request.data.get('id')
         new_quantity = int(request.data.get('quantity', 1))
 
-
+        # Проверка корректности количества
         if new_quantity <= 0:
-            return Response({'error': 'Invalid quantity'}, status=400)
+            return Response({'error': 'Invalid quantity. Quantity must be greater than 0.'}, status=400)
 
+        # Поиск элемента корзины
         try:
             cart_item = get_object_or_404(CartItem, cart__user=request.user, product__id=product_id)
         except NotFound:
-            return Response({'error': 'Product not found in cart'}, status=404)
+            return Response({'error': 'Product not found in cart.'}, status=404)
 
-        # Проверка, есть ли достаточно товара на складе
+        # Проверка наличия достаточного количества на складе
         if new_quantity > cart_item.product.quantity:
-            return Response({'error': 'Not enough stock'}, status=400)
-
+            return Response({'error': 'Not enough stock available.'}, status=400)
 
         product = cart_item.product
-        price = product.price * (1 - (Decimal(product.promotion or 0) / Decimal(100)))
 
+        # Определяем цену и скидку в зависимости от роли пользователя
+        if request.user.role == 'wholesaler':  # Если пользователь — оптовик
+            base_price = product.wholesale_price
+            promotion = product.wholesale_promotion
+        else:  # Если пользователь — обычный клиент
+            base_price = product.price
+            promotion = product.promotion
 
+        # Рассчитываем цену с учетом скидки
+        if promotion and 0 <= promotion <= 100:
+            price = base_price * (1 - (Decimal(promotion) / Decimal(100)))  # Применяем скидку
+        else:
+            price = base_price  # Если скидки нет или она некорректна, используем базовую цену
+
+        # Проверка на отрицательную цену
+        if price < 0:
+            return Response({'error': 'Calculated price is invalid.'}, status=400)
+
+        # Обновляем количество и цену товара в корзине
         cart_item.quantity = new_quantity
-        cart_item.price = price * Decimal(new_quantity)
+        cart_item.price = round(price, 2)  # Сохраняем цену единицы товара с учетом скидки
         cart_item.save()
 
-        # Пересчитываем общую стоимость корзины
-        self.update_cart_totals(cart_item.cart)
+        # Отладочные сообщения
+        print(f"Updated cart_item: {cart_item.product.title}, Quantity: {cart_item.quantity}, Price: {cart_item.price}")
 
+        # Пересчитываем общую стоимость корзины
+        cart = cart_item.cart
+        total_quantity = 0
+        subtotal = Decimal(0)  # Сумма без скидок
+        total_price = Decimal(0)  # Сумма с учетом скидок
+
+        for item in cart.items.all():
+            # Получаем базовую цену и скидку в зависимости от роли пользователя
+            if request.user.role == 'wholesaler':
+                item_base_price = item.product.wholesale_price
+                item_promotion = item.product.wholesale_promotion
+            else:
+                item_base_price = item.product.price
+                item_promotion = item.product.promotion
+
+            # Рассчитываем цену с учетом скидки
+            if item_promotion and 0 <= item_promotion <= 100:
+                item_price = item_base_price * (1 - Decimal(item_promotion) / Decimal(100))  # Цена со скидкой
+            else:
+                item_price = item_base_price  # Если скидки нет, используем базовую цену
+
+            # Обновляем цену товара в корзине
+            item.price = round(item_price, 2)
+            item.save()
+
+            # Добавляем к общей стоимости
+            total_quantity += item.quantity
+            subtotal += item_base_price * item.quantity  # Сумма без скидки
+            total_price += item_price * item.quantity  # Сумма с учетом скидки
+
+            # Отладочные сообщения
+            print(f"Updated item: {item.product.title}, Quantity: {item.quantity}, Price: {item.price}")
+
+        # Обновляем данные корзины
+        cart.total_quantity = total_quantity
+        cart.subtotal = round(subtotal, 2)  # Стоимость без скидок
+        cart.total_price = round(total_price, 2)  # Стоимость с учетом скидок
+        cart.save()
+
+        # Отладочные сообщения
+        print(
+            f"Updated cart: Total Quantity: {cart.total_quantity}, Subtotal: {cart.subtotal}, Total Price: {cart.total_price}")
+
+        # Возвращаем обновленные данные корзины
         return Response({
-            'items': CartItemsSerializer(cart_item.cart.items.all(), many=True).data,
-            'total_quantity': cart_item.cart.total_quantity,
-            'subtotal': cart_item.cart.subtotal,
-            'totalPrice': cart_item.cart.total_price,
-            'success': 'Product updated'
+            'items': CartItemsSerializer(cart.items.all(), many=True, context={'request': request}).data,
+            'total_quantity': cart.total_quantity,
+            'subtotal': round(cart.subtotal, 2),  # Стоимость без скидок
+            'totalPrice': round(cart.total_price, 2),  # Стоимость с учетом скидок
+            'success': 'Product updated successfully'
         })
+
     @swagger_auto_schema(
         tags=['cart'],
         operation_description="Удалить товар из корзины по ID товара.",
@@ -257,38 +341,23 @@ class CartView(APIView):
                             items=openapi.Schema(
                                 type=openapi.TYPE_OBJECT,
                                 properties={
-                                    'cart_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID корзины"),
-                                    'product_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID товара"),
-                                    'title': openapi.Schema(type=openapi.TYPE_STRING, description="Название товара"),
-                                    'image': openapi.Schema(type=openapi.TYPE_STRING,
-                                                            description="URL изображения товара"),
-                                    'quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
-                                                               description="Количество товара"),
-                                    'price': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT,
-                                                            description="Цена товара"),
-                                },
+                                    'cart_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'product_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'title': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'image': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'price': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT),
+                                }
                             )
                         ),
-                        'total_quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
-                                                         description="Общее количество товаров в корзине"),
-                        'subtotal': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT,
-                                                   description="Сумма без учета скидки"),
-                        'totalPrice': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT,
-                                                     description="Итоговая стоимость товаров с учетом скидки"),
-                        'success': openapi.Schema(type=openapi.TYPE_STRING,
-                                                  description="Сообщение об успешном удалении товара"),
+                        'total_quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'subtotal': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT),
+                        'totalPrice': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT),
                     }
-                )
-            ),
-            400: openapi.Response(
-                description="Не указан ID товара или некорректный запрос",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={'error': openapi.Schema(type=openapi.TYPE_STRING, description="Ошибка")}
-                )
+                ),
             ),
             404: openapi.Response(
-                description="Товар не найден в корзине",
+                description="Товар не найден",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={'error': openapi.Schema(type=openapi.TYPE_STRING, description="Ошибка")}
@@ -297,36 +366,33 @@ class CartView(APIView):
         }
     )
     def delete(self, request):
-        product_id = request.data.get('id')
-        if not product_id:
-            return Response({'error': 'Product ID not provided'}, status=400)
+        data = request.data
+        user = request.user
+        product_id = data.get('id')
 
-        cart_items = CartItem.objects.filter(product__id=product_id, cart__user=request.user)
+        # Получаем корзину пользователя
+        cart = Cart.objects.filter(user=user, ordered=False).first()
 
-        if not cart_items.exists():
-            return Response({'error': 'No CartItem found for this product in your cart'}, status=404)
+        if not cart:
+            return Response({'error': 'Cart not found'}, status=404)
 
-        for cart_item in cart_items:
+        try:
+            # Находим товар в корзине по product_id
+            cart_item = CartItem.objects.get(cart=cart, product__id=product_id)
             cart_item.delete()
+        except CartItem.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
 
-        # Обновляем общую стоимость корзины
-        cart = Cart.objects.get(user=request.user, ordered=False)
-        self.update_cart_totals(cart)
+        # Пересчитываем общую стоимость корзины после удаления товара
+        cart.total_price = sum(item.price * item.quantity for item in CartItem.objects.filter(cart=cart))
+        cart.save()
 
         return Response({
             'items': CartItemsSerializer(cart.items.all(), many=True).data,
             'total_quantity': cart.total_quantity,
             'subtotal': cart.subtotal,
             'totalPrice': cart.total_price,
-            'success': 'Items removed from cart'
         }, status=204)
-
-    def update_cart_totals(self, cart):
-        """Метод для пересчета итоговых значений корзины"""
-        cart.total_price = sum(item.price * item.quantity for item in cart.items.all())
-        cart.total_quantity = sum(item.quantity for item in cart.items.all())
-        cart.subtotal = sum(item.product.price * item.quantity for item in cart.items.all())
-        cart.save()
 
 class CreateOrderView(APIView):
     permission_classes = [IsAuthenticated]

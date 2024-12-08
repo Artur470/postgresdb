@@ -45,19 +45,20 @@ from .serializers import ReviewSummarySerializer, ReviewCreateSerializer
 
 logger = logging.getLogger(__name__)
 
-
 class HomepageView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
     @swagger_auto_schema(
         tags=['product'],
         operation_description="Этот эндпоинт возвращает данные для главной страницы, "
                               "включая баннер, товар дня, новые товары, "
                               "товары со скидками и популярные товары."
-                              "Для выбора товрав дня, надо найти товар который "
-                              "мы хотим сделать товаром дня, и надо обновить "
-                              "как product_of_the_day = True, после этого, "
-                              "этот товар будет товаром дня "
+                              "Для выбора товара дня, нужно обновить поле `product_of_the_day = True`, "
+                              "и этот товар будет отображаться как товар дня."
     )
     def get(self, request, *args, **kwargs):
+        # Получаем данные для главной страницы
         banner = Banner.objects.filter(id=1).first()
         product_of_the_day = Product.objects.filter(is_product_of_the_day=True, is_active=True).first()
         new_products = Product.objects.filter(is_active=True).order_by('-id')[:5]
@@ -69,13 +70,19 @@ class HomepageView(APIView):
             review_count__gt=0
         ).order_by('-avg_rating')[:10]
 
+        # Подготавливаем контекст для сериализаторов, передаем request для получения роли пользователя
+        context = {
+            'request': request
+        }
+
+        # Формируем ответ
         response_data = {
             "homepage": {
                 "banner": self.serialize_banner(banner),
-                "product_of_the_day": self.serialize_product(product_of_the_day),
-                "promotion": self.serialize_products(promotion_products),
-                "popular": self.serialize_products(popular_products),
-                "new": self.serialize_products(new_products),
+                "product_of_the_day": self.serialize_product(product_of_the_day, context),
+                "promotion": self.serialize_products(promotion_products, context),
+                "popular": self.serialize_products(popular_products, context),
+                "new": self.serialize_products(new_products, context),
             }
         }
 
@@ -83,21 +90,22 @@ class HomepageView(APIView):
 
     def serialize_banner(self, banner):
         if banner:
-            # Предположим, у вас есть сериализатор для модели Banner
+            # Сериализация баннера
             serializer = BannerSerializer(banner)
             return serializer.data
         return None
 
-    def serialize_product(self, product):
+    def serialize_product(self, product, context):
         if product:
-            serializer = ProductShortSerializer(product)
+            # Сериализация продукта для товар дня
+            serializer = ProductShortSerializer(product, context=context)
             return serializer.data
         return None
 
-    def serialize_products(self, products):
-        serializer = ProductShortSerializer(products, many=True)
+    def serialize_products(self, products, context):
+        # Сериализация списка продуктов
+        serializer = ProductShortSerializer(products, many=True, context=context)
         return serializer.data
-
 
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
@@ -237,7 +245,6 @@ class ColorDetailView(generics.RetrieveUpdateDestroyAPIView):
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
 
-
 class ProductListView(generics.ListAPIView):
     queryset = Product.objects.filter(is_active=True).order_by('id')
     serializer_class = ProductShortSerializer
@@ -245,6 +252,8 @@ class ProductListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = ProductFilter
     search_fields = ['title', 'description', 'price', 'promotion', 'category__label']
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['product'],
@@ -254,6 +263,9 @@ class ProductListView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
+        """
+        Реализация фильтрации товаров.
+        """
         queryset = super().get_queryset()
 
         # Получаем значения фильтров из параметров запроса
@@ -262,39 +274,48 @@ class ProductListView(generics.ListAPIView):
         color_value = self.request.query_params.get('color', '').strip()
         search_value = self.request.query_params.get('search', '').strip()
 
-
+        # Создаем объект фильтрации
         filters = Q()
 
-
+        # Фильтр по категории
         if category_value:
             if Category.objects.filter(value__iexact=category_value).exists():
                 filters &= Q(category__value__iexact=category_value)
 
-
+        # Фильтр по бренду
         if brand_value:
             if Brand.objects.filter(value__iexact=brand_value).exists():
                 filters &= Q(brand__value__iexact=brand_value)
 
-
+        # Фильтр по цвету
         if color_value:
             if Color.objects.filter(value__iexact=color_value).exists():
                 filters &= Q(color__value__iexact=color_value)
 
-
+        # Фильтр по поисковому запросу
         if search_value:
             filters &= Q(title__icontains=search_value) | Q(description__icontains=search_value) | \
                        Q(price__icontains=search_value) | Q(promotion__icontains=search_value) | \
                        Q(category__label__icontains=search_value)
 
-
+        # Применяем фильтры к queryset
         queryset = queryset.filter(filters)
 
         return queryset
 
+    def get_serializer_context(self):
+        """
+        Передача `request` в контекст сериализатора для корректной работы логики.
+        """
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['product'],
@@ -303,11 +324,10 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
                               "схожесть выбирается по категории и по цене товара."
     )
     def get_similar_products(self, product):
-
         price = Decimal(product.price)
         price_range = Decimal('0.2') * price
 
-
+        # Фильтрация похожих товаров по категории и цене
         similar_products = Product.objects.filter(
             category=product.category
         ).exclude(id=product.id).filter(
@@ -325,8 +345,12 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def get(self, request, *args, **kwargs):
         product = self.get_object()  # Получаем объект продукта
-        data = ProductSerializer(product).data  # Сериализуем его данные
-        data['similar_products'] = self.get_similar_products(product)  # Получаем похожие товары
+        # Сериализация данных продукта с учетом роли пользователя
+        data = self.get_product_data(product, request)
+
+        # Получаем похожие товары
+        data['similar_products'] = self.get_similar_products(product)
+
         return Response(data)
 
     @swagger_auto_schema(
@@ -342,6 +366,25 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+    def get_product_data(self, product, request):
+        """
+        Получение данных о продукте с учетом цены в зависимости от роли пользователя.
+        """
+        data = ProductSerializer(product).data
+
+        # Проверяем, если пользователь авторизован и меняем цену в зависимости от его роли
+        if request.user.is_authenticated:
+            user = request.user
+            if user.role == 'wholesaler':  # Для оптовиков показываем оптовые цены
+                # Обновляем цену и промо-цену для оптовика
+                data['price'] = product.wholesale_price if product.wholesale_price else product.price
+                data['promotion'] = product.wholesale_promotion if product.wholesale_promotion else product.promotion
+            else:  # Для обычных пользователей — обычные цены
+                data['price'] = product.price
+                data['promotion'] = product.promotion
+
+        return data
 
 
 class ProductNewView(generics.ListAPIView):
@@ -425,13 +468,13 @@ class ProductCreateView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         # Добавляем пользователя в контекст сериализатора, а не в request.data
         serializer_context = {
-            'request': request,
-            'user': request.user  # Передаем текущего пользователя в контекст
+            'request': request,  # Добавляем request в контекст
         }
-        # Вызываем родительский метод с контекстом
-        return super().post(request, *args, **kwargs)
-
-
+        # Вызываем родительский метод с переданным контекстом
+        serializer = self.get_serializer(data=request.data, context=serializer_context)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()

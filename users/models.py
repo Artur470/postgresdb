@@ -15,7 +15,15 @@ class CustomUserManager(BaseUserManager):
         if not email:
             raise ValueError('The Email field must be set')
         email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
+
+        # Проверяем значение wholesaler, чтобы установить соответствующую роль
+        wholesaler = extra_fields.get('wholesaler', False)
+        if wholesaler:
+            role = 'wholesaler'
+        else:
+            role = 'customer'
+
+        user = self.model(email=email, role=role, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -23,8 +31,10 @@ class CustomUserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'admin')  # Роль для суперпользователя - 'admin'
 
         return self.create_user(email, password, **extra_fields)
+
 
 class Gender(models.Model):
     value = models.CharField(max_length=50, unique=True)  # Поле value будет уникальным (например, 'man', 'woman')

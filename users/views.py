@@ -108,21 +108,25 @@ class UserRegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+
+            # Проверка, является ли пользователь оптовым клиентом
             if user.wholesaler and user.otp_code:
+                # Отправка OTP-кода на email администратора
                 return Response(
                     {
                         'message': 'OTP код отправлен на email администратора. '
-                                'В течении 3-х дней администратор позвонит на ваш номер '
-                                'и сообщит OTP код, чтобы одобрить вашу регистрацию, '
-                                'код вы должны ввести вместе со своим email, '
-                                'чтобы зарегестрироваться как оптовый покупатель'
-
-                     },
+                                   'В течении 3-х дней администратор позвонит на ваш номер '
+                                   'и сообщит OTP код, чтобы одобрить вашу регистрацию, '
+                                   'код вы должны ввести вместе со своим email, '
+                                   'чтобы зарегистрироваться как оптовый покупатель.'
+                    },
                     status=status.HTTP_200_OK
                 )
             else:
+                # Отправка успешной регистрации пользователя
                 user_data = UserRegistrationSerializer(user).data
                 return Response({'user': user_data}, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -139,9 +143,15 @@ class WholesalerOTPVerificationView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = WholesalerOTPVerificationSerializer(data=request.data)
         if serializer.is_valid():
+            # Сохраняем пользователя с подтвержденной OTP
             user = serializer.save()
+            # Привязка роли к пользователю при успешной верификации
+            user.role = 'wholesaler'
+            user.save()
+
             user_data = UserRegistrationSerializer(user).data
             return Response({'user': user_data}, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
