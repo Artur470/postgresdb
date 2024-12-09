@@ -46,8 +46,8 @@ from .serializers import ReviewSummarySerializer, ReviewCreateSerializer
 logger = logging.getLogger(__name__)
 
 class HomepageView(APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['product'],
@@ -252,8 +252,8 @@ class ProductListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = ProductFilter
     search_fields = ['title', 'description', 'price', 'promotion', 'category__label']
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['product'],
