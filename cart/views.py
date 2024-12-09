@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from rest_framework.decorators import action
+
 from django.http import Http404
 from django.db.models import F, ExpressionWrapper, FloatField
 from .models import Cart, CartItem, Order, PaymentMethod
@@ -54,9 +56,6 @@ class CartView(APIView):
             ),
         },
     )
-
-
-
     def get(self, request):
         user = request.user
         # Проверка роли через поле `role` у пользователя
@@ -218,7 +217,7 @@ class CartView(APIView):
             ),
         }
     )
-    def put(self, request):
+    def put(self, request, *args, **kwargs):
         """
         Обновление количества товара в корзине.
         """
@@ -228,21 +227,21 @@ class CartView(APIView):
 
         # Проверка корректности количества
         if new_quantity <= 0:
-            return Response({'error': 'Invalid quantity. Quantity must be greater than 0.'}, status=400)
+            return Response({'error': 'Invalid quantity. Quantity must be greater than 0.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Поиск элемента корзины
         try:
             cart_item = get_object_or_404(CartItem, cart__user=request.user, product__id=product_id)
-        except NotFound:
-            return Response({'error': 'Product not found in cart.'}, status=404)
+        except Http404:
+            return Response({'error': 'Product not found in cart.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Проверка наличия достаточного количества на складе
         if new_quantity > cart_item.product.quantity:
-            return Response({'error': 'Not enough stock available.'}, status=400)
-
-        product = cart_item.product
+            return Response({'error': 'Not enough stock available.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Определяем цену и скидку в зависимости от роли пользователя
+        product = cart_item.product
         if request.user.role == 'wholesaler':  # Если пользователь — оптовик
             base_price = product.wholesale_price
             promotion = product.wholesale_promotion
@@ -258,23 +257,21 @@ class CartView(APIView):
 
         # Проверка на отрицательную цену
         if price < 0:
-            return Response({'error': 'Calculated price is invalid.'}, status=400)
+            return Response({'error': 'Calculated price is invalid.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Обновляем количество и цену товара в корзине
         cart_item.quantity = new_quantity
         cart_item.price = round(price, 2)  # Сохраняем цену единицы товара с учетом скидки
         cart_item.save()
 
-        # Отладочные сообщения
-        print(f"Updated cart_item: {cart_item.product.title}, Quantity: {cart_item.quantity}, Price: {cart_item.price}")
-
         # Пересчитываем общую стоимость корзины
         cart = cart_item.cart
         total_quantity = 0
-        subtotal = Decimal(0)  # Сумма без скидок
-        total_price = Decimal(0)  # Сумма с учетом скидок
+        subtotal = Decimal(0)  # Сумма без скидки
+        total_price = Decimal(0)  # Сумма с учетом скидки
 
-        for item in cart.items.all():
+        # Пересчитываем все товары в корзине
+        for item in cart.items.all():  # Используем related_name 'items'
             # Получаем базовую цену и скидку в зависимости от роли пользователя
             if request.user.role == 'wholesaler':
                 item_base_price = item.product.wholesale_price
@@ -298,28 +295,21 @@ class CartView(APIView):
             subtotal += item_base_price * item.quantity  # Сумма без скидки
             total_price += item_price * item.quantity  # Сумма с учетом скидки
 
-            # Отладочные сообщения
-            print(f"Updated item: {item.product.title}, Quantity: {item.quantity}, Price: {item.price}")
-
         # Обновляем данные корзины
         cart.total_quantity = total_quantity
         cart.subtotal = round(subtotal, 2)  # Стоимость без скидок
         cart.total_price = round(total_price, 2)  # Стоимость с учетом скидок
         cart.save()
 
-        # Отладочные сообщения
-        print(
-            f"Updated cart: Total Quantity: {cart.total_quantity}, Subtotal: {cart.subtotal}, Total Price: {cart.total_price}")
-
         # Возвращаем обновленные данные корзины
         return Response({
             'items': CartItemsSerializer(cart.items.all(), many=True, context={'request': request}).data,
+            # Используем 'items'
             'total_quantity': cart.total_quantity,
             'subtotal': round(cart.subtotal, 2),  # Стоимость без скидок
             'totalPrice': round(cart.total_price, 2),  # Стоимость с учетом скидок
             'success': 'Product updated successfully'
         })
-
     @swagger_auto_schema(
         tags=['cart'],
         operation_description="Удалить товар из корзины по ID товара.",
@@ -437,3 +427,5 @@ class CreateOrderView(APIView):
         cart.save()
 
         return Response(OrderSerializer(order).data, status=201)
+
+#######et4hetrhgbdbsddfb

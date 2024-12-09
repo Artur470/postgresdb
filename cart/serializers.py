@@ -4,6 +4,12 @@ from .models import Cart, CartItem, Order, PaymentMethod
 from product.serializers import ProductSerializer
 from .utils import remove_zero_quantity_items
 from decimal import Decimal
+
+from decimal import Decimal
+from rest_framework import serializers
+from django.db.models import Sum
+
+
 class CartSerializer(serializers.ModelSerializer):
     total_price = serializers.SerializerMethodField()  # Итоговая цена корзины
     total_quantity = serializers.SerializerMethodField()  # Общее количество товаров
@@ -27,7 +33,7 @@ class CartSerializer(serializers.ModelSerializer):
         return round(total_price, 2)  # Округляем до 2 знаков
 
     def get_subtotal(self, obj):
-        """Рассчитывает стоимость корзины без учета скидок."""
+        """Рассчитывает стоимость корзины без учета скидок (только стандартные цены)."""
         subtotal = Decimal('0.00')
         user = self.context.get('request').user if self.context.get('request') else None
 
