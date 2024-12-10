@@ -6,7 +6,7 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import action
-
+from django.db.models import F, Sum, DecimalField, ExpressionWrapper
 from django.http import Http404
 from django.db.models import F, ExpressionWrapper, FloatField
 from .models import Cart, CartItem, Order, PaymentMethod
@@ -282,18 +282,18 @@ class CartView(APIView):
 
             # Рассчитываем цену с учетом скидки
             if item_promotion and 0 <= item_promotion <= 100:
-                item_price = item_base_price * (1 - Decimal(item_promotion) / Decimal(100))  # Цена со скидкой
+                item_price_with_discount = item_base_price * (1 - Decimal(item_promotion) / Decimal(100))
             else:
-                item_price = item_base_price  # Если скидки нет, используем базовую цену
+                item_price_with_discount = item_base_price
 
             # Обновляем цену товара в корзине
-            item.price = round(item_price, 2)
+            item.price = round(item_price_with_discount, 2)
             item.save()
 
             # Добавляем к общей стоимости
             total_quantity += item.quantity
-            subtotal += item_base_price * item.quantity  # Сумма без скидки
-            total_price += item_price * item.quantity  # Сумма с учетом скидки
+            subtotal += item_base_price * item.quantity  # Сумма без скидок (базовая цена * количество)
+            total_price += item_promotion * item.quantity  # Сумма с учетом скидки (цена с скидкой * количество)
 
         # Обновляем данные корзины
         cart.total_quantity = total_quantity
@@ -304,12 +304,12 @@ class CartView(APIView):
         # Возвращаем обновленные данные корзины
         return Response({
             'items': CartItemsSerializer(cart.items.all(), many=True, context={'request': request}).data,
-            # Используем 'items'
             'total_quantity': cart.total_quantity,
             'subtotal': round(cart.subtotal, 2),  # Стоимость без скидок
             'totalPrice': round(cart.total_price, 2),  # Стоимость с учетом скидок
             'success': 'Product updated successfully'
         })
+
     @swagger_auto_schema(
         tags=['cart'],
         operation_description="Удалить товар из корзины по ID товара.",
@@ -428,4 +428,3 @@ class CreateOrderView(APIView):
 
         return Response(OrderSerializer(order).data, status=201)
 
-#######et4hetrhgbdbsddfb
