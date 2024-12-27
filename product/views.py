@@ -455,6 +455,13 @@ class ProductPopularView(generics.ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser
+from .serializers import ProductCreateSerializer
+from .models import Product
 
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
@@ -463,14 +470,85 @@ class ProductCreateView(generics.CreateAPIView):
 
     @swagger_auto_schema(
         tags=['product'],
-        operation_description="Этот эндпоинт позволяет создать новый продукт."
+        operation_description="Этот эндпоинт позволяет создать новый продукт.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['title', 'category', 'price', 'main_characteristics'],
+            properties={
+                'title': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Название продукта"
+                ),
+                'category': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="ID категории продукта"
+                ),
+                'price': openapi.Schema(
+                    type=openapi.TYPE_NUMBER,
+                    format=openapi.FORMAT_DECIMAL,
+                    description="Цена продукта"
+                ),
+                'main_characteristics': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'label': openapi.Schema(
+                                type=openapi.TYPE_STRING,
+                                description="Название характеристики"
+                            ),
+                            'value': openapi.Schema(
+                                type=openapi.TYPE_STRING,
+                                description="Значение характеристики"
+                            )
+                        },
+                        required=['label', 'value']
+                    ),
+                    description="Список характеристик продукта (не более 4). Пример: "
+                                "[{'label': 'Цвет', 'value': 'Красный'}, {'label': 'Размер', 'value': 'L'}]"
+                ),
+            },
+        ),
+        responses={
+            201: openapi.Response(
+                description="Продукт успешно создан",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'id': openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            description="ID созданного продукта"
+                        ),
+                        'title': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Название продукта"
+                        ),
+                        'main_characteristics': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    'label': openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="Название характеристики"
+                                    ),
+                                    'value': openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="Значение характеристики"
+                                    )
+                                }
+                            )
+                        ),
+                    },
+                )
+            ),
+            400: "Неверный запрос"
+        }
     )
     def post(self, request, *args, **kwargs):
-        # Добавляем пользователя в контекст сериализатора, а не в request.data
         serializer_context = {
-            'request': request,  # Добавляем request в контекст
+            'request': request,
         }
-        # Вызываем родительский метод с переданным контекстом
         serializer = self.get_serializer(data=request.data, context=serializer_context)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)

@@ -70,16 +70,23 @@ class Product(models.Model):
     main_characteristics = models.JSONField(default=list)
 
     def save(self, *args, **kwargs):
+        # Автоматическое отключение товара, если количество = 0
         if self.quantity == 0:
             self.is_active = False
+
         # Проверка на ограничение по количеству характеристик
         if len(self.main_characteristics) > 4:
             raise ValidationError("Нельзя добавлять более 4 характеристик.")
+
+        # Преобразование key в label
+        for characteristic in self.main_characteristics:
+            if "key" in characteristic:
+                characteristic["label"] = characteristic.pop("key")
+
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.title} ({self.id})"
-
 class Review(models.Model):
     RATING_CHOICES = [
         (1, '1 star'),

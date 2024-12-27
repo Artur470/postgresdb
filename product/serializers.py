@@ -346,49 +346,46 @@ class ProductSerializer(serializers.ModelSerializer):
         return value
 
     def get_price(self, obj):
-        """
-        Метод для получения цены в зависимости от роли пользователя.
-        Если пользователь оптовик, используем wholesale_price, иначе стандартную цену.
-        """
         request = self.context.get('request')
 
         if request and request.user.is_authenticated:
             user = request.user
-            # Если пользователь оптовик, возвращаем wholesale_price
             if user.role == 'wholesaler':
                 return obj.wholesale_price if obj.wholesale_price else obj.price
-        return obj.price  # Если пользователь не оптовик, возвращаем обычную цену
+        return obj.price
 
     def get_promotion(self, obj):
-        """
-        Метод для получения промо-цены в зависимости от роли пользователя.
-        Если пользователь оптовик, используем wholesale_promotion, иначе стандартную promotion.
-        """
         request = self.context.get('request')
 
         if request and request.user.is_authenticated:
             user = request.user
-            # Если пользователь оптовик, возвращаем wholesale_promotion
             if user.role == 'wholesaler':
                 return obj.wholesale_promotion if obj.wholesale_promotion else obj.promotion
-        return obj.promotion  # Если пользователь не оптовик, возвращаем обычную промо-цену
+        return obj.promotion
 
     def to_representation(self, instance):
         """
-        Переопределяем метод to_representation, чтобы изменить цену и промо-цену в зависимости от роли пользователя.
+        Переопределяем метод to_representation, чтобы изменить ключи main_characteristics.
         """
         representation = super().to_representation(instance)
+
+        # Обновление ключей main_characteristics
+        main_characteristics = representation.get('main_characteristics', [])
+        if isinstance(main_characteristics, list):
+            updated_characteristics = []
+            for characteristic in main_characteristics:
+                if 'key' in characteristic:
+                    characteristic['label'] = characteristic.pop('key')
+                updated_characteristics.append(characteristic)
+            representation['main_characteristics'] = updated_characteristics
 
         # Если пользователь аутентифицирован, обновляем цену и промо-цену в данных
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             user = request.user
             if user.role == 'wholesaler':
-                # Если у пользователя роль 'wholesaler', обновляем цену и промо-цену
-                representation[
-                    'price'] = instance.wholesale_price if instance.wholesale_price else instance.price
-                representation[
-                    'promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+                representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
+                representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
 
         return representation
 

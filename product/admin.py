@@ -2,13 +2,16 @@ from django.contrib import admin
 from .models import Category, Product, Banner, Color
 from django.core.exceptions import ValidationError
 from django.forms import JSONField, ModelForm
-from .models import Product
+
 
 class ProductAdminForm(ModelForm):
     """
     Форма для модели Product с проверкой количества характеристик.
     """
-    main_characteristics = JSONField(required=False, help_text="Добавьте характеристики в формате JSON (не более 4).")
+    main_characteristics = JSONField(
+        required=False,
+        help_text="Добавьте характеристики в формате JSON (не более 4)."
+    )
 
     def clean_main_characteristics(self):
         main_characteristics = self.cleaned_data.get('main_characteristics', [])
@@ -19,6 +22,12 @@ class ProductAdminForm(ModelForm):
 
         if len(main_characteristics) > 4:
             raise ValidationError("Нельзя добавлять более 4 характеристик для одного товара.")
+
+        # Преобразуем key в label
+        for characteristic in main_characteristics:
+            if "key" in characteristic:
+                characteristic["label"] = characteristic.pop("key")
+
         return main_characteristics
 
 
@@ -55,7 +64,14 @@ class ProductAdmin(admin.ModelAdmin):
         """
         if len(obj.main_characteristics) > 4:
             raise ValidationError("Нельзя добавлять более 4 характеристик для одного товара.")
+
+        # Убеждаемся, что в данных есть label вместо key
+        for characteristic in obj.main_characteristics:
+            if "key" in characteristic:
+                characteristic["label"] = characteristic.pop("key")
+
         super().save_model(request, obj, form, change)
+
 
 admin.site.register(Category)
 admin.site.register(Banner)
