@@ -271,6 +271,11 @@ class BrandSerializer(serializers.ModelSerializer):
 
         return super().create(validated_data)
 
+    def create(self, validated_data):
+        label = validated_data.get('label')
+        value = validated_data.get('value', label)  # Используем label для определения value
+        # Тут можно расширить логику при необходимости
+        return super().create(validated_data)
 class ReviewSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
@@ -428,7 +433,6 @@ class ProductShortSerializer(serializers.ModelSerializer):
 
         return representation
 
-
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField(required=False)
 
@@ -531,6 +535,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if color_value:
             instance.color = Color.objects.get(value=color_value)
 
+        # Обновление данных с помощью родительского метода
         instance = super().update(instance, validated_data)
 
         for key, value in images_data.items():
@@ -550,6 +555,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             value = char_data.get('value')
 
             if label and value:
+                # Проверка существования характеристики и ее создание или обновление
                 characteristic, created = ProductCharacteristic.objects.get_or_create(
                     label=label, product=product
                 )
@@ -558,6 +564,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
                     characteristic.save()
 
     def _update_characteristics(self, product, characteristics_data):
+        # Удаление старых характеристик и добавление новых
         product.characteristics.all().delete()
         self._create_characteristics(product, characteristics_data)
 

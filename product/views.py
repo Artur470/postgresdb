@@ -436,6 +436,7 @@ class ProductPopularView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductCreateSerializer
@@ -475,35 +476,41 @@ class ProductCreateView(generics.CreateAPIView):
             )
         ]
     )
-    def post(self, request, *args, **kwargs):
-        serializer_context = {
-            'request': request,
-        }
+    class ProductCreateView(APIView):
+        def post(self, request, *args, **kwargs):
+            # Подготовка контекста сериализатора
+            serializer_context = {
+                'request': request,
+            }
 
-        # Обработаем данные для category, brand и color
-        request_data = request.data.copy()
-        brand_value = request_data.get('brand')
-        category_value = request_data.get('category')
-        color_value = request_data.get('color')
+            # Получение данных из запроса
+            request_data = request.data.copy()  # Копирование данных запроса
+            brand_value = request_data.get('brand')
+            category_value = request_data.get('category')
+            color_value = request_data.get('color')
 
-        # Проверка на существование бренда
-        if brand_value and not Brand.objects.filter(value=brand_value).exists():
-            return Response({"error": "Brand with the specified value does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            # Проверка на существование бренда
+            if brand_value and not Brand.objects.filter(value=brand_value).exists():
+                return Response({"error": "Brand with the specified value does not exist"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-        # Проверка на существование категории
-        if category_value and not Category.objects.filter(value=category_value).exists():
-            return Response({"error": "Category with the specified value does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            # Проверка на существование категории
+            if category_value and not Category.objects.filter(value=category_value).exists():
+                return Response({"error": "Category with the specified value does not exist"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-        # Проверка на существование цвета
-        if color_value and not Color.objects.filter(value=color_value).exists():
-            return Response({"error": "Color with the specified value does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            # Проверка на существование цвета
+            if color_value and not Color.objects.filter(value=color_value).exists():
+                return Response({"error": "Color with the specified value does not exist"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-        # Создание продукта
-        serializer = self.get_serializer(data=request_data, context=serializer_context)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # Создание и валидация продукта
+            serializer = ProductCreateSerializer(data=request_data, context=serializer_context)
+            if serializer.is_valid():
+                # Сохраняем объект в базе
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
