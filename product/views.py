@@ -462,7 +462,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from .serializers import ProductCreateSerializer
 from .models import Product
-
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductCreateSerializer
@@ -488,6 +487,41 @@ class ProductCreateView(generics.CreateAPIView):
                     format=openapi.FORMAT_DECIMAL,
                     description="Цена продукта"
                 ),
+                'promotion': openapi.Schema(
+                    type=openapi.TYPE_NUMBER,
+                    format=openapi.FORMAT_DECIMAL,
+                    description="Акционная цена для обычных клиентов"
+                ),
+                'wholesale_price': openapi.Schema(
+                    type=openapi.TYPE_NUMBER,
+                    format=openapi.FORMAT_DECIMAL,
+                    description="Цена для оптовиков"
+                ),
+                'wholesale_promotion': openapi.Schema(
+                    type=openapi.TYPE_NUMBER,
+                    format=openapi.FORMAT_DECIMAL,
+                    description="Акционная цена для оптовиков"
+                ),
+                'brand': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="ID бренда продукта"
+                ),
+                'quantity': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="Количество товара на складе"
+                ),
+                'description': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Описание продукта"
+                ),
+                'is_product_of_the_day': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Является ли продуктом дня"
+                ),
+                'is_active': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Продукт активен"
+                ),
                 'main_characteristics': openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     items=openapi.Schema(
@@ -507,6 +541,30 @@ class ProductCreateView(generics.CreateAPIView):
                     description="Список характеристик продукта (не более 4). Пример: "
                                 "[{'label': 'Цвет', 'value': 'Красный'}, {'label': 'Размер', 'value': 'L'}]"
                 ),
+                'color': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="ID цвета продукта"
+                ),
+                'image1': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="URL изображения продукта 1"
+                ),
+                'image2': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="URL изображения продукта 2"
+                ),
+                'image3': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="URL изображения продукта 3"
+                ),
+                'image4': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="URL изображения продукта 4"
+                ),
+                'image5': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="URL изображения продукта 5"
+                ),
             },
         ),
         responses={
@@ -522,6 +580,50 @@ class ProductCreateView(generics.CreateAPIView):
                         'title': openapi.Schema(
                             type=openapi.TYPE_STRING,
                             description="Название продукта"
+                        ),
+                        'category': openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            description="ID категории продукта"
+                        ),
+                        'price': openapi.Schema(
+                            type=openapi.TYPE_NUMBER,
+                            format=openapi.FORMAT_DECIMAL,
+                            description="Цена продукта"
+                        ),
+                        'promotion': openapi.Schema(
+                            type=openapi.TYPE_NUMBER,
+                            format=openapi.FORMAT_DECIMAL,
+                            description="Акционная цена для обычных клиентов"
+                        ),
+                        'wholesale_price': openapi.Schema(
+                            type=openapi.TYPE_NUMBER,
+                            format=openapi.FORMAT_DECIMAL,
+                            description="Цена для оптовиков"
+                        ),
+                        'wholesale_promotion': openapi.Schema(
+                            type=openapi.TYPE_NUMBER,
+                            format=openapi.FORMAT_DECIMAL,
+                            description="Акционная цена для оптовиков"
+                        ),
+                        'brand': openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            description="ID бренда продукта"
+                        ),
+                        'quantity': openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            description="Количество товара на складе"
+                        ),
+                        'description': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Описание продукта"
+                        ),
+                        'is_product_of_the_day': openapi.Schema(
+                            type=openapi.TYPE_BOOLEAN,
+                            description="Является ли продуктом дня"
+                        ),
+                        'is_active': openapi.Schema(
+                            type=openapi.TYPE_BOOLEAN,
+                            description="Продукт активен"
                         ),
                         'main_characteristics': openapi.Schema(
                             type=openapi.TYPE_ARRAY,
@@ -539,6 +641,30 @@ class ProductCreateView(generics.CreateAPIView):
                                 }
                             )
                         ),
+                        'color': openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            description="ID цвета продукта"
+                        ),
+                        'image1': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="URL изображения продукта 1"
+                        ),
+                        'image2': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="URL изображения продукта 2"
+                        ),
+                        'image3': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="URL изображения продукта 3"
+                        ),
+                        'image4': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="URL изображения продукта 4"
+                        ),
+                        'image5': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="URL изображения продукта 5"
+                        ),
                     },
                 )
             ),
@@ -553,6 +679,7 @@ class ProductCreateView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()

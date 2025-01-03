@@ -469,20 +469,22 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, instance):
-        # Это метод, который будет вызываться при GET-запросах.
         representation = super().to_representation(instance)
         request = self.context.get('request')
 
         if request and request.user.is_authenticated:
             user = request.user
-            # Если пользователь оптовик, меняем цену и акцию на оптовые
             if user.role == 'wholesaler':
                 representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
-                representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+                representation[
+                    'promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
             else:
-                # Для обычного клиента показываем стандартные цены
                 representation['price'] = instance.price
                 representation['promotion'] = instance.promotion
+        else:
+            # Обработка случая, когда пользователь анонимный
+            representation['price'] = instance.price
+            representation['promotion'] = instance.promotion
 
         return representation
 
@@ -495,11 +497,13 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             user = request.user
             if user.role == 'wholesaler':  # Если роль оптовика
-                # Переносим оптовые цены в стандартные поля, если они есть
                 product.price = product.wholesale_price if product.wholesale_price else product.price
                 product.promotion = product.wholesale_promotion if product.wholesale_promotion else product.promotion
+        else:
+            # Обработка случая, когда пользователь анонимный
+            product.price = product.price  # Убедитесь, что цена устанавливается корректно
+            product.promotion = product.promotion  # То же самое для промо-акции
 
-        # Сохраняем продукт с новыми значениями цен
         product.save()
 
         # Создаем характеристики, если они переданы
@@ -517,7 +521,6 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             user = request.user
             if user.role == 'wholesaler':  # Если роль оптовика
-                # Переносим оптовые цены в стандартные поля, если они есть
                 instance.price = instance.wholesale_price if instance.wholesale_price else instance.price
                 instance.promotion = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
 
@@ -535,9 +538,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             ProductCharacteristic.objects.create(product=product, **char_data)
 
     def _update_characteristics(self, product, characteristics_data):
+        # Вместо удаления старых характеристик, мы можем обновить их или создать новые
+        # Это зависит от вашего бизнес-логики.
         product.characteristics.all().delete()  # Удаляем старые характеристики
         self._create_characteristics(product, characteristics_data)  # Создаем новые
-
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
