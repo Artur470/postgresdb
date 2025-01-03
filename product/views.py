@@ -678,12 +678,35 @@ class ProductCreateView(generics.CreateAPIView):
         serializer_context = {
             'request': request,
         }
-        serializer = self.get_serializer(data=request.data, context=serializer_context)
+
+        # Обработаем данные для category, brand и color, передавая их как value
+        request_data = request.data.copy()
+        brand_value = request_data.get('brand')
+        category_value = request_data.get('category')
+        color_value = request_data.get('color')
+
+        if brand_value:
+            # Проверяем, есть ли такой бренд
+            if not Brand.objects.filter(value=brand_value).exists():
+                return Response({"error": "Brand with the specified value does not exist"},
+                                status=status.HTTP_400_BAD_REQUEST)
+        if category_value:
+            # Проверяем, есть ли такая категория
+            if not Category.objects.filter(value=category_value).exists():
+                return Response({"error": "Category with the specified value does not exist"},
+                                status=status.HTTP_400_BAD_REQUEST)
+        if color_value:
+            # Проверяем, есть ли такой цвет
+            if not Color.objects.filter(value=color_value).exists():
+                return Response({"error": "Color with the specified value does not exist"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        # Если все проверки прошли, создаем сериализатор
+        serializer = self.get_serializer(data=request_data, context=serializer_context)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewCreateSerializer

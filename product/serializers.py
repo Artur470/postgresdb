@@ -441,6 +441,9 @@ class ProductShortSerializer(serializers.ModelSerializer):
                 representation['promotion'] = instance.promotion
 
         return representation
+
+
+
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField()
     image1 = CloudinaryField('image1')
@@ -496,18 +499,18 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
-        # Получаем label для brand, category и color
-        brand_label = validated_data.pop('brand', None)
-        category_label = validated_data.pop('category', None)
-        color_label = validated_data.pop('color', None)
+        # Получаем значение (value) для brand, category и color
+        brand_value = validated_data.pop('brand', None)
+        category_value = validated_data.pop('category', None)
+        color_value = validated_data.pop('color', None)
 
-        # Находим объекты по их label
-        if brand_label:
-            validated_data['brand'] = Brand.objects.get(label=brand_label)
-        if category_label:
-            validated_data['category'] = Category.objects.get(label=category_label)
-        if color_label:
-            validated_data['color'] = Color.objects.get(label=color_label)
+        # Находим объекты по их value
+        if brand_value:
+            validated_data['brand'] = Brand.objects.get(value=brand_value)
+        if category_value:
+            validated_data['category'] = Category.objects.get(value=category_value)
+        if color_value:
+            validated_data['color'] = Color.objects.get(value=color_value)
 
         product = Product.objects.create(**validated_data)
 
@@ -540,18 +543,18 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
-        # Получаем label для brand, category и color
-        brand_label = validated_data.pop('brand', None)
-        category_label = validated_data.pop('category', None)
-        color_label = validated_data.pop('color', None)
+        # Получаем значение (value) для brand, category и color
+        brand_value = validated_data.pop('brand', None)
+        category_value = validated_data.pop('category', None)
+        color_value = validated_data.pop('color', None)
 
-        # Находим объекты по их label
-        if brand_label:
-            instance.brand = Brand.objects.get(label=brand_label)
-        if category_label:
-            instance.category = Category.objects.get(label=category_label)
-        if color_label:
-            instance.color = Color.objects.get(label=color_label)
+        # Находим объекты по их value
+        if brand_value:
+            instance.brand = Brand.objects.get(value=brand_value)
+        if category_value:
+            instance.category = Category.objects.get(value=category_value)
+        if color_value:
+            instance.color = Color.objects.get(value=color_value)
 
         # Обновляем остальные поля
         instance = super().update(instance, validated_data)
