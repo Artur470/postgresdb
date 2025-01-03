@@ -1,24 +1,6 @@
-from rest_framework.views import APIView
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter
+from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
-from .pagination import CustomPagination
-from product.serializers import *
-from django.db.models import Count, Avg
-from product.models import *
-from .filters import ProductFilter
 from drf_yasg import openapi
-from django.db.models import Q
-from decimal import Decimal
-import logging
-from rest_framework import generics
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Review
-from .serializers import ReviewCreateSerializer, ReviewSummarySerializer
-from rest_framework.permissions import IsAuthenticated
-from django.http import Http404
-from rest_framework_simplejwt.authentication import JWTAuthentication
 import logging
 from decimal import Decimal
 from rest_framework.permissions import IsAdminUser
@@ -454,259 +436,75 @@ class ProductPopularView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
-from .serializers import ProductCreateSerializer
-from .models import Product
-from rest_framework.parsers import MultiPartParser, FormParser
-
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductCreateSerializer
     permission_classes = [AllowAny]
-    parser_classes = [MultiPartParser, FormParser]  # Добавляем парсеры для обработки multipart/form-data запросов
 
     @swagger_auto_schema(
         tags=['product'],
         operation_description="Этот эндпоинт позволяет создать новый продукт.",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=['title', 'category', 'price', 'main_characteristics'],
-            properties={
-                'title': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Название продукта"
-                ),
-                'category': openapi.Schema(
-                    type=openapi.TYPE_INTEGER,
-                    description="ID категории продукта"
-                ),
-                'price': openapi.Schema(
-                    type=openapi.TYPE_NUMBER,
-                    format=openapi.FORMAT_DECIMAL,
-                    description="Цена продукта"
-                ),
-                'promotion': openapi.Schema(
-                    type=openapi.TYPE_NUMBER,
-                    format=openapi.FORMAT_DECIMAL,
-                    description="Акционная цена для обычных клиентов"
-                ),
-                'wholesale_price': openapi.Schema(
-                    type=openapi.TYPE_NUMBER,
-                    format=openapi.FORMAT_DECIMAL,
-                    description="Цена для оптовиков"
-                ),
-                'wholesale_promotion': openapi.Schema(
-                    type=openapi.TYPE_NUMBER,
-                    format=openapi.FORMAT_DECIMAL,
-                    description="Акционная цена для оптовиков"
-                ),
-                'brand': openapi.Schema(
-                    type=openapi.TYPE_INTEGER,
-                    description="ID бренда продукта"
-                ),
-                'quantity': openapi.Schema(
-                    type=openapi.TYPE_INTEGER,
-                    description="Количество товара на складе"
-                ),
-                'description': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Описание продукта"
-                ),
-                'is_product_of_the_day': openapi.Schema(
-                    type=openapi.TYPE_BOOLEAN,
-                    description="Является ли продуктом дня"
-                ),
-                'is_active': openapi.Schema(
-                    type=openapi.TYPE_BOOLEAN,
-                    description="Продукт активен"
-                ),
-                'main_characteristics': openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(
-                        type=openapi.TYPE_OBJECT,
-                        properties={
-                            'label': openapi.Schema(
-                                type=openapi.TYPE_STRING,
-                                description="Название характеристики"
-                            ),
-                            'value': openapi.Schema(
-                                type=openapi.TYPE_STRING,
-                                description="Значение характеристики"
-                            )
-                        },
-                        required=['label', 'value']
-                    ),
-                    description="Список характеристик продукта (не более 4). Пример: "
-                                "[{'label': 'Цвет', 'value': 'Красный'}, {'label': 'Размер', 'value': 'L'}]"
-                ),
-                'color': openapi.Schema(
-                    type=openapi.TYPE_INTEGER,
-                    description="ID цвета продукта"
-                ),
-                'image1': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Изображение 1 продукта. Загруженный файл"
-                ),
-                'image2': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Изображение 2 продукта. Загруженный файл"
-                ),
-                'image3': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Изображение 3 продукта. Загруженный файл"
-                ),
-                'image4': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Изображение 4 продукта. Загруженный файл"
-                ),
-                'image5': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Изображение 5 продукта. Загруженный файл"
-                ),
-            },
-        ),
+        request_body=ProductCreateSerializer,
         responses={
             201: openapi.Response(
                 description="Продукт успешно создан",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'id': openapi.Schema(
-                            type=openapi.TYPE_INTEGER,
-                            description="ID созданного продукта"
-                        ),
-                        'title': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="Название продукта"
-                        ),
-                        'category': openapi.Schema(
-                            type=openapi.TYPE_INTEGER,
-                            description="ID категории продукта"
-                        ),
-                        'price': openapi.Schema(
-                            type=openapi.TYPE_NUMBER,
-                            format=openapi.FORMAT_DECIMAL,
-                            description="Цена продукта"
-                        ),
-                        'promotion': openapi.Schema(
-                            type=openapi.TYPE_NUMBER,
-                            format=openapi.FORMAT_DECIMAL,
-                            description="Акционная цена для обычных клиентов"
-                        ),
-                        'wholesale_price': openapi.Schema(
-                            type=openapi.TYPE_NUMBER,
-                            format=openapi.FORMAT_DECIMAL,
-                            description="Цена для оптовиков"
-                        ),
-                        'wholesale_promotion': openapi.Schema(
-                            type=openapi.TYPE_NUMBER,
-                            format=openapi.FORMAT_DECIMAL,
-                            description="Акционная цена для оптовиков"
-                        ),
-                        'brand': openapi.Schema(
-                            type=openapi.TYPE_INTEGER,
-                            description="ID бренда продукта"
-                        ),
-                        'quantity': openapi.Schema(
-                            type=openapi.TYPE_INTEGER,
-                            description="Количество товара на складе"
-                        ),
-                        'description': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="Описание продукта"
-                        ),
-                        'is_product_of_the_day': openapi.Schema(
-                            type=openapi.TYPE_BOOLEAN,
-                            description="Является ли продуктом дня"
-                        ),
-                        'is_active': openapi.Schema(
-                            type=openapi.TYPE_BOOLEAN,
-                            description="Продукт активен"
-                        ),
-                        'main_characteristics': openapi.Schema(
-                            type=openapi.TYPE_ARRAY,
-                            items=openapi.Schema(
-                                type=openapi.TYPE_OBJECT,
-                                properties={
-                                    'label': openapi.Schema(
-                                        type=openapi.TYPE_STRING,
-                                        description="Название характеристики"
-                                    ),
-                                    'value': openapi.Schema(
-                                        type=openapi.TYPE_STRING,
-                                        description="Значение характеристики"
-                                    )
-                                }
-                            )
-                        ),
-                        'color': openapi.Schema(
-                            type=openapi.TYPE_INTEGER,
-                            description="ID цвета продукта"
-                        ),
-                        'image1': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="URL изображения продукта 1"
-                        ),
-                        'image2': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="URL изображения продукта 2"
-                        ),
-                        'image3': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="URL изображения продукта 3"
-                        ),
-                        'image4': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="URL изображения продукта 4"
-                        ),
-                        'image5': openapi.Schema(
-                            type=openapi.TYPE_STRING,
-                            description="URL изображения продукта 5"
-                        ),
-                    },
-                )
+                schema=ProductCreateSerializer
             ),
-            400: "Неверный запрос"
-        }
+            400: openapi.Response(
+                description="Ошибка запроса. Возможно, вы указали несуществующие значения для категорий, брендов или цветов.",
+                schema=openapi.Schema(type=openapi.TYPE_OBJECT, properties={
+                    'error': openapi.Schema(type=openapi.TYPE_STRING, description="Описание ошибки")
+                })
+            )
+        },
+        parameters=[
+            openapi.Parameter('brand', openapi.IN_BODY, description="Бренд продукта, необходимо указать существующий бренд.",
+                              required=True, type=openapi.TYPE_STRING),
+            openapi.Parameter('category', openapi.IN_BODY, description="Категория продукта, необходимо указать существующую категорию.",
+                              required=True, type=openapi.TYPE_STRING),
+            openapi.Parameter('color', openapi.IN_BODY, description="Цвет продукта, необходимо указать существующий цвет.",
+                              required=True, type=openapi.TYPE_STRING),
+            openapi.Parameter(
+                'main_characteristics', openapi.IN_BODY,
+                description="Основные характеристики продукта. Должны быть переданы как массив объектов с полями 'label' и 'value'.",
+                required=False, type=openapi.TYPE_ARRAY,
+                items=openapi.Items(type=openapi.TYPE_OBJECT, properties={
+                    'label': openapi.Schema(type=openapi.TYPE_STRING, description="Название характеристики, например, 'main'"),
+                    'value': openapi.Schema(type=openapi.TYPE_STRING, description="Значение характеристики, например, 'grngd'")
+                })
+            )
+        ]
     )
     def post(self, request, *args, **kwargs):
         serializer_context = {
             'request': request,
         }
 
-        # Обработаем данные для category, brand и color, передавая их как value
+        # Обработаем данные для category, brand и color
         request_data = request.data.copy()
         brand_value = request_data.get('brand')
         category_value = request_data.get('category')
         color_value = request_data.get('color')
 
-        if brand_value:
-            # Проверяем, есть ли такой бренд
-            if not Brand.objects.filter(value=brand_value).exists():
-                return Response({"error": "Brand with the specified value does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        if category_value:
-            # Проверяем, есть ли такая категория
-            if not Category.objects.filter(value=category_value).exists():
-                return Response({"error": "Category with the specified value does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        if color_value:
-            # Проверяем, есть ли такой цвет
-            if not Color.objects.filter(value=color_value).exists():
-                return Response({"error": "Color with the specified value does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST)
+        # Проверка на существование бренда
+        if brand_value and not Brand.objects.filter(value=brand_value).exists():
+            return Response({"error": "Brand with the specified value does not exist"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Если все проверки прошли, создаем сериализатор
+        # Проверка на существование категории
+        if category_value and not Category.objects.filter(value=category_value).exists():
+            return Response({"error": "Category with the specified value does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверка на существование цвета
+        if color_value and not Color.objects.filter(value=color_value).exists():
+            return Response({"error": "Color with the specified value does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Создание продукта
         serializer = self.get_serializer(data=request_data, context=serializer_context)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewCreateSerializer

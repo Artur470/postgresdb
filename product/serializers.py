@@ -281,8 +281,8 @@ class ProductSerializer(serializers.ModelSerializer):
     avg_rating = serializers.SerializerMethodField()
     main_characteristics = serializers.JSONField()
     reviews = ReviewSummarySerializer(many=True, read_only=True)
-    price = serializers.SerializerMethodField()  # Добавлен метод для получения цены
-    promotion = serializers.SerializerMethodField()  # Добавлен метод для получения промо-цены
+    price = serializers.SerializerMethodField()
+    promotion = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -339,8 +339,7 @@ class ProductSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Каждая характеристика должна содержать ключ и значение.")
             if not isinstance(characteristic['key'], str):
                 raise serializers.ValidationError("Ключ характеристики должен быть строкой.")
-            if not isinstance(characteristic['value'], str) and not isinstance(characteristic['value'],
-                                                                               (int, float)):
+            if not isinstance(characteristic['value'], (str, int, float)):
                 raise serializers.ValidationError(
                     "Значение характеристики должно быть строкой, числом или числом с плавающей точкой.")
 
@@ -365,12 +364,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return obj.promotion
 
     def to_representation(self, instance):
-        """
-        Переопределяем метод to_representation, чтобы изменить ключи main_characteristics.
-        """
         representation = super().to_representation(instance)
 
-        # Обновление ключей main_characteristics
         main_characteristics = representation.get('main_characteristics', [])
         if isinstance(main_characteristics, list):
             updated_characteristics = []
@@ -380,7 +375,6 @@ class ProductSerializer(serializers.ModelSerializer):
                 updated_characteristics.append(characteristic)
             representation['main_characteristics'] = updated_characteristics
 
-        # Если пользователь аутентифицирован, обновляем цену и промо-цену в данных
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             user = request.user
@@ -407,36 +401,28 @@ class ProductShortSerializer(serializers.ModelSerializer):
         ]
 
     def get_avg_rating(self, obj):
-        # Вычисление среднего рейтинга
         if obj.reviews.exists():
             avg_rating = obj.reviews.aggregate(Avg('rating'))['rating__avg']
-            return round_to_nearest_half(avg_rating)
+            return round(avg_rating, 1) if avg_rating else 0
         return 0
 
     def get_images(self, obj):
-        # Получение изображений
         request = self.context.get('request')
-        images = [
-            obj.image1.url if obj.image1 else None,
-        ]
+        images = [obj.image1.url if obj.image1 else None]
         if request:
             return [request.build_absolute_uri(image) for image in images if image]
         return [image for image in images if image]
 
     def to_representation(self, instance):
-        """
-        Переопределение вывода данных для отображения цен в зависимости от роли пользователя.
-        """
         representation = super().to_representation(instance)
         request = self.context.get('request')
 
         if request and request.user.is_authenticated:
             user = request.user
-            # Проверка роли пользователя и корректировка цен
-            if hasattr(user, 'role') and user.role == 'wholesaler':  # Если роль оптовик
+            if hasattr(user, 'role') and user.role == 'wholesaler':
                 representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
                 representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
-            else:  # Если пользователь обычный клиент
+            else:
                 representation['price'] = instance.price
                 representation['promotion'] = instance.promotion
 
@@ -445,7 +431,8 @@ class ProductShortSerializer(serializers.ModelSerializer):
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
-    main_characteristics = serializers.JSONField()
+    main_characteristics = serializers.JSONField(required=False)
+
     image1 = CloudinaryField('image1')
     image2 = CloudinaryField('image2')
     image3 = CloudinaryField('image3')
@@ -483,13 +470,12 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             user = request.user
             if user.role == 'wholesaler':
-                representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
-                representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+                representation['price'] = instance.wholesale_price or instance.price
+                representation['promotion'] = instance.wholesale_promotion or instance.promotion
             else:
                 representation['price'] = instance.price
                 representation['promotion'] = instance.promotion
         else:
-            # Обработка случая, когда пользователь анонимный
             representation['price'] = instance.price
             representation['promotion'] = instance.promotion
 
@@ -499,12 +485,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
-        # Получаем значение (value) для brand, category и color
         brand_value = validated_data.pop('brand', None)
         category_value = validated_data.pop('category', None)
         color_value = validated_data.pop('color', None)
 
-        # Находим объекты по их value
         if brand_value:
             validated_data['brand'] = Brand.objects.get(value=brand_value)
         if category_value:
@@ -514,26 +498,12 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         product = Product.objects.create(**validated_data)
 
-        # Получаем текущего пользователя из контекста
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            user = request.user
-            if user.role == 'wholesaler':  # Если роль оптовика
-                product.price = product.wholesale_price if product.wholesale_price else product.price
-                product.promotion = product.wholesale_promotion if product.wholesale_promotion else product.promotion
-        else:
-            # Обработка случая, когда пользователь анонимный
-            product.price = product.price  # Убедитесь, что цена устанавливается корректно
-            product.promotion = product.promotion  # То же самое для промо-акции
-
-        # Сохраняем изображения
         for key, value in images_data.items():
             if value:
                 setattr(product, key, value)
 
         product.save()
 
-        # Создаем характеристики, если они переданы
         if characteristics_data:
             self._create_characteristics(product, characteristics_data)
 
@@ -543,12 +513,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
-        # Получаем значение (value) для brand, category и color
         brand_value = validated_data.pop('brand', None)
         category_value = validated_data.pop('category', None)
         color_value = validated_data.pop('color', None)
 
-        # Находим объекты по их value
         if brand_value:
             instance.brand = Brand.objects.get(value=brand_value)
         if category_value:
@@ -556,25 +524,14 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if color_value:
             instance.color = Color.objects.get(value=color_value)
 
-        # Обновляем остальные поля
         instance = super().update(instance, validated_data)
 
-        # Получаем текущего пользователя из контекста
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            user = request.user
-            if user.role == 'wholesaler':  # Если роль оптовика
-                instance.price = instance.wholesale_price if instance.wholesale_price else instance.price
-                instance.promotion = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
-
-        # Сохраняем изображения
         for key, value in images_data.items():
             if value:
                 setattr(instance, key, value)
 
         instance.save()
 
-        # Обновляем характеристики, если они переданы
         if characteristics_data:
             self._update_characteristics(instance, characteristics_data)
 
@@ -585,19 +542,17 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             label = char_data.get('label')
             value = char_data.get('value')
 
-            # Преобразуем label и value в объекты характеристик
             if label and value:
-                characteristic, created = ProductCharacteristic.objects.get_or_create(label=label, product=product)
+                characteristic, created = ProductCharacteristic.objects.get_or_create(
+                    label=label, product=product
+                )
                 if not created:
-                    # Если характеристика уже существует, обновляем её
                     characteristic.value = value
                     characteristic.save()
 
     def _update_characteristics(self, product, characteristics_data):
-        # Вместо удаления старых характеристик, мы можем обновить их или создать новые
-        # Это зависит от вашего бизнес-логики.
-        product.characteristics.all().delete()  # Удаляем старые характеристики
-        self._create_characteristics(product, characteristics_data)  # Создаем новые
+        product.characteristics.all().delete()
+        self._create_characteristics(product, characteristics_data)
 
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
