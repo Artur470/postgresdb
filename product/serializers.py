@@ -499,20 +499,33 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         # Ищем объект по полю 'value', которое передается как строка
         if brand_value:
-            validated_data['brand'] = Brand.objects.get(value=brand_value)
+            try:
+                validated_data['brand'] = Brand.objects.get(value=brand_value)
+            except Brand.DoesNotExist:
+                raise serializers.ValidationError({"error": "Brand with the specified value does not exist"})
+
         if category_value:
-            validated_data['category'] = Category.objects.get(value=category_value)
+            try:
+                validated_data['category'] = Category.objects.get(value=category_value)
+            except Category.DoesNotExist:
+                raise serializers.ValidationError({"error": "Category with the specified value does not exist"})
+
         if color_value:
-            validated_data['color'] = Color.objects.get(value=color_value)
+            try:
+                validated_data['color'] = Color.objects.get(value=color_value)
+            except Color.DoesNotExist:
+                raise serializers.ValidationError({"error": "Color with the specified value does not exist"})
 
         product = Product.objects.create(**validated_data)
 
+        # Обработка изображений
         for key, value in images_data.items():
             if value:
                 setattr(product, key, value)
 
         product.save()
 
+        # Обработка характеристик продукта
         if characteristics_data:
             self._create_characteristics(product, characteristics_data)
 
@@ -529,21 +542,34 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         # Ищем объект по полю 'value', которое передается как строка
         if brand_value:
-            instance.brand = Brand.objects.get(value=brand_value)
+            try:
+                instance.brand = Brand.objects.get(value=brand_value)
+            except Brand.DoesNotExist:
+                raise serializers.ValidationError({"error": "Brand with the specified value does not exist"})
+
         if category_value:
-            instance.category = Category.objects.get(value=category_value)
+            try:
+                instance.category = Category.objects.get(value=category_value)
+            except Category.DoesNotExist:
+                raise serializers.ValidationError({"error": "Category with the specified value does not exist"})
+
         if color_value:
-            instance.color = Color.objects.get(value=color_value)
+            try:
+                instance.color = Color.objects.get(value=color_value)
+            except Color.DoesNotExist:
+                raise serializers.ValidationError({"error": "Color with the specified value does not exist"})
 
         # Обновление данных с помощью родительского метода
         instance = super().update(instance, validated_data)
 
+        # Обработка изображений
         for key, value in images_data.items():
             if value:
                 setattr(instance, key, value)
 
         instance.save()
 
+        # Обработка характеристик продукта
         if characteristics_data:
             self._update_characteristics(instance, characteristics_data)
 
