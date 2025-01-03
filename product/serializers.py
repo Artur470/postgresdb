@@ -445,11 +445,11 @@ class ProductShortSerializer(serializers.ModelSerializer):
 
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField()
-    image1 = CloudinaryField('image1', required=False)
-    image2 = CloudinaryField('image2', required=False)
-    image3 = CloudinaryField('image3', required=False)
-    image4 = CloudinaryField('image4', required=False)
-    image5 = CloudinaryField('image5', required=False)
+    image1 = CloudinaryField('image1')
+    image2 = CloudinaryField('image2')
+    image3 = CloudinaryField('image3')
+    image4 = CloudinaryField('image4')
+    image5 = CloudinaryField('image5')
 
     class Meta:
         model = Product
