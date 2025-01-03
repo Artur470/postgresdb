@@ -4,6 +4,7 @@ from .models import Product, Category, Color, Brand, Review, Banner
 from .utils import round_to_nearest_half
 from cloudinary.forms import CloudinaryFileField
 from django.conf import settings
+from cloudinary.models import CloudinaryField
 class CategorySerializer(serializers.ModelSerializer):
     value = serializers.SerializerMethodField()
     label = serializers.SerializerMethodField()
@@ -441,8 +442,14 @@ class ProductShortSerializer(serializers.ModelSerializer):
 
         return representation
 
+
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField()
+    image1 = CloudinaryField('image1', required=False)
+    image2 = CloudinaryField('image2', required=False)
+    image3 = CloudinaryField('image3', required=False)
+    image4 = CloudinaryField('image4', required=False)
+    image5 = CloudinaryField('image5', required=False)
 
     class Meta:
         model = Product
@@ -490,6 +497,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         characteristics_data = validated_data.pop('main_characteristics', [])
+        images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
         product = Product.objects.create(**validated_data)
 
         # Получаем текущего пользователя из контекста
@@ -504,6 +512,11 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             product.price = product.price  # Убедитесь, что цена устанавливается корректно
             product.promotion = product.promotion  # То же самое для промо-акции
 
+        # Сохраняем изображения
+        for key, value in images_data.items():
+            if value:
+                setattr(product, key, value)
+
         product.save()
 
         # Создаем характеристики, если они переданы
@@ -514,6 +527,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         characteristics_data = validated_data.pop('main_characteristics', [])
+        images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
         instance = super().update(instance, validated_data)
 
         # Получаем текущего пользователя из контекста
@@ -524,7 +538,11 @@ class ProductCreateSerializer(serializers.ModelSerializer):
                 instance.price = instance.wholesale_price if instance.wholesale_price else instance.price
                 instance.promotion = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
 
-        # Сохраняем изменения в продукте
+        # Сохраняем изображения
+        for key, value in images_data.items():
+            if value:
+                setattr(instance, key, value)
+
         instance.save()
 
         # Обновляем характеристики, если они переданы

@@ -462,10 +462,13 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from .serializers import ProductCreateSerializer
 from .models import Product
+from rest_framework.parsers import MultiPartParser, FormParser
+
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductCreateSerializer
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser]  # Добавляем парсеры для обработки multipart/form-data запросов
 
     @swagger_auto_schema(
         tags=['product'],
@@ -547,23 +550,23 @@ class ProductCreateView(generics.CreateAPIView):
                 ),
                 'image1': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description="URL изображения продукта 1"
+                    description="Изображение 1 продукта. Загруженный файл"
                 ),
                 'image2': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description="URL изображения продукта 2"
+                    description="Изображение 2 продукта. Загруженный файл"
                 ),
                 'image3': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description="URL изображения продукта 3"
+                    description="Изображение 3 продукта. Загруженный файл"
                 ),
                 'image4': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description="URL изображения продукта 4"
+                    description="Изображение 4 продукта. Загруженный файл"
                 ),
                 'image5': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description="URL изображения продукта 5"
+                    description="Изображение 5 продукта. Загруженный файл"
                 ),
             },
         ),
