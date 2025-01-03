@@ -429,7 +429,6 @@ class ProductShortSerializer(serializers.ModelSerializer):
         return representation
 
 
-
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField(required=False)
 
@@ -438,6 +437,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     image3 = CloudinaryField('image3')
     image4 = CloudinaryField('image4')
     image5 = CloudinaryField('image5')
+
+    brand = serializers.SlugRelatedField(slug_field='value', queryset=Brand.objects.all(), required=True)
+    category = serializers.SlugRelatedField(slug_field='value', queryset=Category.objects.all(), required=True)
+    color = serializers.SlugRelatedField(slug_field='value', queryset=Color.objects.all(), required=True)
 
     class Meta:
         model = Product
@@ -485,10 +488,12 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
+        # Получаем значения для brand, category, color, ожидая строки
         brand_value = validated_data.pop('brand', None)
         category_value = validated_data.pop('category', None)
         color_value = validated_data.pop('color', None)
 
+        # Ищем объект по полю 'value', которое передается как строка
         if brand_value:
             validated_data['brand'] = Brand.objects.get(value=brand_value)
         if category_value:
@@ -513,10 +518,12 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
+        # Получаем значения для brand, category, color, ожидая строки
         brand_value = validated_data.pop('brand', None)
         category_value = validated_data.pop('category', None)
         color_value = validated_data.pop('color', None)
 
+        # Ищем объект по полю 'value', которое передается как строка
         if brand_value:
             instance.brand = Brand.objects.get(value=brand_value)
         if category_value:
@@ -553,7 +560,6 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     def _update_characteristics(self, product, characteristics_data):
         product.characteristics.all().delete()
         self._create_characteristics(product, characteristics_data)
-
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
