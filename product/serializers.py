@@ -441,8 +441,6 @@ class ProductShortSerializer(serializers.ModelSerializer):
                 representation['promotion'] = instance.promotion
 
         return representation
-
-
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField()
     image1 = CloudinaryField('image1')
@@ -483,8 +481,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             user = request.user
             if user.role == 'wholesaler':
                 representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
-                representation[
-                    'promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+                representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
             else:
                 representation['price'] = instance.price
                 representation['promotion'] = instance.promotion
@@ -498,6 +495,20 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
+
+        # Получаем label для brand, category и color
+        brand_label = validated_data.pop('brand', None)
+        category_label = validated_data.pop('category', None)
+        color_label = validated_data.pop('color', None)
+
+        # Находим объекты по их label
+        if brand_label:
+            validated_data['brand'] = Brand.objects.get(label=brand_label)
+        if category_label:
+            validated_data['category'] = Category.objects.get(label=category_label)
+        if color_label:
+            validated_data['color'] = Color.objects.get(label=color_label)
+
         product = Product.objects.create(**validated_data)
 
         # Получаем текущего пользователя из контекста
@@ -528,6 +539,21 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
+
+        # Получаем label для brand, category и color
+        brand_label = validated_data.pop('brand', None)
+        category_label = validated_data.pop('category', None)
+        color_label = validated_data.pop('color', None)
+
+        # Находим объекты по их label
+        if brand_label:
+            instance.brand = Brand.objects.get(label=brand_label)
+        if category_label:
+            instance.category = Category.objects.get(label=category_label)
+        if color_label:
+            instance.color = Color.objects.get(label=color_label)
+
+        # Обновляем остальные поля
         instance = super().update(instance, validated_data)
 
         # Получаем текущего пользователя из контекста
@@ -553,13 +579,23 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
     def _create_characteristics(self, product, characteristics_data):
         for char_data in characteristics_data:
-            ProductCharacteristic.objects.create(product=product, **char_data)
+            label = char_data.get('label')
+            value = char_data.get('value')
+
+            # Преобразуем label и value в объекты характеристик
+            if label and value:
+                characteristic, created = ProductCharacteristic.objects.get_or_create(label=label, product=product)
+                if not created:
+                    # Если характеристика уже существует, обновляем её
+                    characteristic.value = value
+                    characteristic.save()
 
     def _update_characteristics(self, product, characteristics_data):
         # Вместо удаления старых характеристик, мы можем обновить их или создать новые
         # Это зависит от вашего бизнес-логики.
         product.characteristics.all().delete()  # Удаляем старые характеристики
         self._create_characteristics(product, characteristics_data)  # Создаем новые
+
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
