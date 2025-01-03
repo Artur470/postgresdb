@@ -35,7 +35,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from rest_framework.permissions import AllowAny
 from product.models import *
 from product.serializers import *
 from .filters import ProductFilter
@@ -465,7 +465,7 @@ from .models import Product
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductCreateSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         tags=['product'],

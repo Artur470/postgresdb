@@ -58,6 +58,11 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ['title', 'category__name', 'brand__name']  # Добавлено для поиска
     list_filter = ['category', 'brand', 'is_active']  # Фильтры
 
+    # Ограничиваем доступ к добавлению товаров через админку
+    def has_add_permission(self, request):
+        # Проверяем, что пользователь является администратором и имеет роль 'admin'
+        return request.user.is_staff and getattr(request.user, 'role', '') == 'admin'
+
     def save_model(self, request, obj, form, change):
         """
         Проверка при сохранении из админки.
