@@ -5,6 +5,8 @@ from .utils import round_to_nearest_half
 from cloudinary.forms import CloudinaryFileField
 from django.conf import settings
 from cloudinary.models import CloudinaryField
+from rest_framework import serializers
+from .models import Product, Brand, Category, Color
 class CategorySerializer(serializers.ModelSerializer):
     value = serializers.SerializerMethodField()
     label = serializers.SerializerMethodField()
@@ -433,18 +435,17 @@ class ProductShortSerializer(serializers.ModelSerializer):
 
         return representation
 
+
 class ProductCreateSerializer(serializers.ModelSerializer):
     main_characteristics = serializers.JSONField(required=False)
-
-    image1 = CloudinaryField('image1')
-    image2 = CloudinaryField('image2')
-    image3 = CloudinaryField('image3')
-    image4 = CloudinaryField('image4')
-    image5 = CloudinaryField('image5')
-
-    brand = serializers.SlugRelatedField(slug_field='value', queryset=Brand.objects.all(), required=True)
-    category = serializers.SlugRelatedField(slug_field='value', queryset=Category.objects.all(), required=True)
-    color = serializers.SlugRelatedField(slug_field='value', queryset=Color.objects.all(), required=True)
+    image1 = serializers.ImageField(required=False, allow_null=True)
+    image2 = serializers.ImageField(required=False, allow_null=True)
+    image3 = serializers.ImageField(required=False, allow_null=True)
+    image4 = serializers.ImageField(required=False, allow_null=True)
+    image5 = serializers.ImageField(required=False, allow_null=True)
+    brand = serializers.SlugRelatedField(queryset=Brand.objects.all(), slug_field='value', required=True)
+    category = serializers.SlugRelatedField(queryset=Category.objects.all(), slug_field='value', required=True)
+    color = serializers.SlugRelatedField(queryset=Color.objects.all(), slug_field='value', required=True)
 
     class Meta:
         model = Product
@@ -470,43 +471,9 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'main_characteristics',
         ]
 
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        request = self.context.get('request')
-
-        if request and request.user.is_authenticated:
-            user = request.user
-            if user.role == 'wholesaler':
-                representation['price'] = instance.wholesale_price or instance.price
-                representation['promotion'] = instance.wholesale_promotion or instance.promotion
-            else:
-                representation['price'] = instance.price
-                representation['promotion'] = instance.promotion
-        else:
-            representation['price'] = instance.price
-            representation['promotion'] = instance.promotion
-
-        return representation
-
     def create(self, validated_data):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
-
-        # Универсальная функция для поиска объекта по значению
-        def get_object_by_value(model, value, field_name):
-            if value:
-                try:
-                    return model.objects.get(value=value)
-                except model.DoesNotExist:
-                    raise serializers.ValidationError({
-                        field_name: f"{model.__name__} with the specified value '{value}' does not exist."
-                    })
-            return None
-
-        # Проверяем и добавляем связанные объекты
-        validated_data['brand'] = get_object_by_value(Brand, validated_data.pop('brand', None), 'brand')
-        validated_data['category'] = get_object_by_value(Category, validated_data.pop('category', None), 'category')
-        validated_data['color'] = get_object_by_value(Color, validated_data.pop('color', None), 'color')
 
         # Создаем продукт
         product = Product.objects.create(**validated_data)
@@ -520,7 +487,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         # Обработка характеристик продукта
         if characteristics_data:
-            self._create_characteristics(product, characteristics_data)
+            self._update_characteristics(product, characteristics_data)
 
         return product
 
@@ -528,29 +495,18 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
-        # Получаем значения для brand, category, color, ожидая строки
+        # Получаем значения для brand, category, color
         brand_value = validated_data.pop('brand', None)
         category_value = validated_data.pop('category', None)
         color_value = validated_data.pop('color', None)
 
-        # Ищем объект по полю 'value', которое передается как строка
+        # Ищем объекты по значению 'value' и обновляем их
         if brand_value:
-            try:
-                instance.brand = Brand.objects.get(value=brand_value)
-            except Brand.DoesNotExist:
-                raise serializers.ValidationError({"error": "Brand with the specified value does not exist"})
-
+            instance.brand = self._get_or_create_object(Brand, brand_value, 'brand')
         if category_value:
-            try:
-                instance.category = Category.objects.get(value=category_value)
-            except Category.DoesNotExist:
-                raise serializers.ValidationError({"error": "Category with the specified value does not exist"})
-
+            instance.category = self._get_or_create_object(Category, category_value, 'category')
         if color_value:
-            try:
-                instance.color = Color.objects.get(value=color_value)
-            except Color.DoesNotExist:
-                raise serializers.ValidationError({"error": "Color with the specified value does not exist"})
+            instance.color = self._get_or_create_object(Color, color_value, 'color')
 
         # Обновление данных с помощью родительского метода
         instance = super().update(instance, validated_data)
@@ -568,25 +524,32 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         return instance
 
-    def _create_characteristics(self, product, characteristics_data):
+    def _get_or_create_object(self, model, value, field_name):
+        """Функция для поиска или создания объекта по значению value"""
+        if value:
+            try:
+                obj = model.objects.get(value=value)
+                return obj
+            except model.DoesNotExist:
+                raise serializers.ValidationError({
+                    field_name: f"{model.__name__} with the specified value '{value}' does not exist."
+                })
+        return None
+
+    def _update_characteristics(self, product, characteristics_data):
+        """Обновление характеристик продукта в JSONField"""
+        current_characteristics = product.main_characteristics or []
+        characteristics_dict = {char['label']: char['value'] for char in current_characteristics}
+
         for char_data in characteristics_data:
             label = char_data.get('label')
             value = char_data.get('value')
 
             if label and value:
-                # Проверка существования характеристики и ее создание или обновление
-                characteristic, created = ProductCharacteristic.objects.get_or_create(
-                    label=label, product=product
-                )
-                if not created:
-                    characteristic.value = value
-                    characteristic.save()
+                characteristics_dict[label] = value
 
-    def _update_characteristics(self, product, characteristics_data):
-        # Удаление старых характеристик и добавление новых
-        product.characteristics.all().delete()
-        self._create_characteristics(product, characteristics_data)
-
+        product.main_characteristics = [{"label": label, "value": value} for label, value in characteristics_dict.items()]
+        product.save()
 class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review

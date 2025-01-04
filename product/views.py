@@ -437,15 +437,7 @@ class ProductPopularView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-def get_object_by_value(model, value):
-    """Функция для получения объекта модели по значению"""
-    if value:
-        try:
-            # Преобразуем value в верхний регистр для корректного поиска
-            return model.objects.get(value=value.upper())  # Ищем в базе по значению в верхнем регистре
-        except model.DoesNotExist:
-            return None
-    return None
+
 
 
 
@@ -488,51 +480,15 @@ class ProductCreateView(generics.CreateAPIView):
             )
         ]
     )
-    def post(self, request, *args, **kwargs):
-        # Подготовка контекста для сериализатора
-        serializer_context = {
-            'request': request,
-        }
-
-        # Получаем данные из запроса
-        request_data = request.data
-        brand_value = request_data.get('brand')  # строка, которую отправляет фронт
-        category_value = request_data.get('category')  # строка, которую отправляет фронт
-        color_value = request_data.get('color')  # строка, которую отправляет фронт
-
-        # Проверка и поиск бренда по значению (value)
-        if brand_value:
-            brand = get_object_by_value(Brand, brand_value)
-            if not brand:
-                return Response({"error": f"Brand with the specified value '{brand_value}' does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST)
-            request_data['brand'] = brand  # заменяем value на сам объект
-
-        # Проверка и поиск категории по значению (value)
-        if category_value:
-            category = get_object_by_value(Category, category_value)
-            if not category:
-                return Response({"error": f"Category with the specified value '{category_value}' does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST)
-            request_data['category'] = category  # заменяем value на сам объект
-
-        # Проверка и поиск цвета по значению (value)
-        if color_value:
-            color = get_object_by_value(Color, color_value)
-            if not color:
-                return Response({"error": f"Color with the specified value '{color_value}' does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST)
-            request_data['color'] = color  # заменяем value на сам объект
-
-        # Создание и валидация продукта с использованием сериализатора
-        serializer = ProductCreateSerializer(data=request_data, context=serializer_context)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+    def get_object_by_value(self, model, value):
+        """
+        Функция для поиска объекта по значению (например, для brand, category, color).
+        Возвращает объект модели или None, если не найден.
+        """
+        try:
+            return model.objects.get(value=value)
+        except model.DoesNotExist:
+            return None
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewCreateSerializer
@@ -569,18 +525,51 @@ class ReviewCreateView(generics.CreateAPIView):
             401: "Аутентификация не выполнена"
         }
     )
-    def perform_create(self, serializer):
-        product = serializer.validated_data['product']
-        # Проверка: один пользователь - один отзыв на продукт
-        if Review.objects.filter(user=self.request.user, product=product).exists():
-            raise serializers.ValidationError("Вы уже оставили отзыв для этого продукта.")
-        serializer.save(user=self.request.user)
-
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # Подготовка контекста для сериализатора
+        serializer_context = {'request': request}
+
+        # Создаем копию данных запроса
+        request_data = request.data.copy()
+
+        # Сопоставляем модели с ключами
+        model_map = {
+            'brand': Brand,
+            'category': Category,
+            'color': Color,
+        }
+
+        # Замена значений на ID объектов
+        for key, model in model_map.items():
+            value = request_data.get(key)
+            if value:
+                obj = self.get_object_by_value(model, value)
+                if not obj:
+                    return Response(
+                        {key: [f"Объект с указанным значением '{value}' не существует."]},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                request_data[key] = obj.id  # Заменяем строковое значение на числовой ID
+
+        # Создание и валидация продукта через сериализатор
+        serializer = ProductCreateSerializer(data=request_data, context=serializer_context)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Пример кода для получения объекта по значению в сериализаторе:
+    def get_object_by_value(model, value, field_name):
+        if value:
+            try:
+                return model.objects.get(
+                    value__iexact=value)  # Убедитесь, что используется 'iexact' для нечувствительности к регистру
+            except model.DoesNotExist:
+                raise serializers.ValidationError({
+                    field_name: f"{model.__name__} with the specified value '{value}' does not exist."
+                })
+        return None
 
 
 class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
