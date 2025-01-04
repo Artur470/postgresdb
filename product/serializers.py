@@ -291,17 +291,22 @@ class ProductSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     promotion = serializers.SerializerMethodField()
 
+    # Используем StringRelatedField для отображения label вместо id
+    category = serializers.StringRelatedField()
+    color = serializers.StringRelatedField()
+    brand = serializers.StringRelatedField()
+
     class Meta:
         model = Product
         fields = [
             'id',
             'title',
-            'category',
-            'color',
+            'category',  # Теперь будет отображаться как label
+            'color',  # Теперь будет отображаться как label
             'images',
             'price',
             'promotion',
-            'brand',
+            'brand',  # Теперь будет отображаться как label
             'quantity',
             'description',
             'is_product_of_the_day',
@@ -390,8 +395,6 @@ class ProductSerializer(serializers.ModelSerializer):
                 representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
 
         return representation
-
-
 class ProductShortSerializer(serializers.ModelSerializer):
     avg_rating = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()

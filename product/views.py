@@ -293,7 +293,6 @@ class ProductListView(generics.ListAPIView):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
-
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
@@ -330,6 +329,11 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         product = self.get_object()  # Получаем объект продукта
         # Сериализация данных продукта с учетом роли пользователя
         data = self.get_product_data(product, request)
+
+        # Преобразуем category, color и brand в label
+        data['category'] = product.category.label if product.category else None
+        data['color'] = product.color.label if product.color else None
+        data['brand'] = product.brand.label if product.brand else None
 
         # Получаем похожие товары
         data['similar_products'] = self.get_similar_products(product)
