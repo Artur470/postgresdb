@@ -106,29 +106,29 @@ class ColorSerializer(serializers.ModelSerializer):
     def get_value(self, obj):
         # Словарь для перевода значений на английский
         translation = {
-            'белый': 'white',
-            'черный': 'black',
-            'красный': 'red',
-            'синий': 'blue',
-            'зеленый': 'green',
-            'желтый': 'yellow',
-            'оранжевый': 'orange',
-            'пурпурный': 'purple',
-            'розовый': 'pink',
-            'серый': 'gray',
-            'коричневый': 'brown',
-            'бежевая': 'beige',
-            'фиолетовый': 'violet',
-            'голубой': 'light blue',
-            'бирюзовый': 'turquoise',
-            'мятный': 'mint',
-            'лавандовый': 'lavender',
-            'гранатовый': 'pomegranate',
-            'песочный': 'sand',
-            'оливковый': 'olive',
-            'малахитовый': 'malachite',
-            'медный': 'copper',
-            'слоновая кость': 'ivory',
+            'white': 'white',
+            'black': 'black',
+            'red': 'red',
+            'blue': 'blue',
+            'green': 'green',
+            'yellow': 'yellow',
+            'orange': 'orange',
+            'purple': 'purple',
+            'pink': 'pink',
+            'gray': 'gray',
+            'brown': 'brown',
+            'beige': 'beige',
+            'violet': 'violet',
+            'light blue': 'light blue',
+            'turquoise': 'turquoise',
+            'mint': 'mint',
+            'lavender': 'lavender',
+            'pomegranate': 'pomegranate',
+            'sand': 'sand',
+            'olive': 'olive',
+            'malachite': 'malachite',
+            'copper': 'copper',
+            'ivory': 'ivory',
         }
 
         # Проверяем, есть ли значение
@@ -144,29 +144,29 @@ class ColorSerializer(serializers.ModelSerializer):
 
         # Словарь для перевода значений на английский
         translation = {
-            'белый': 'white',
-            'черный': 'black',
-            'красный': 'red',
-            'синий': 'blue',
-            'зеленый': 'green',
-            'желтый': 'yellow',
-            'оранжевый': 'orange',
-            'пурпурный': 'purple',
-            'розовый': 'pink',
-            'серый': 'gray',
-            'коричневый': 'brown',
-            'бежевая': 'beige',
-            'фиолетовый': 'violet',
-            'голубой': 'light blue',
-            'бирюзовый': 'turquoise',
-            'мятный': 'mint',
-            'лавандовый': 'lavender',
-            'гранатовый': 'pomegranate',
-            'песочный': 'sand',
-            'оливковый': 'olive',
-            'малахитовый': 'malachite',
-            'медный': 'copper',
-            'слоновая кость': 'ivory',
+            'white': 'white',
+            'black': 'black',
+            'red': 'red',
+            'blue': 'blue',
+            'green': 'green',
+            'yellow': 'yellow',
+            'orange': 'orange',
+            'purple': 'purple',
+            'pink': 'pink',
+            'gray': 'gray',
+            'brown': 'brown',
+            'beige': 'beige',
+            'violet': 'violet',
+            'light blue': 'light blue',
+            'turquoise': 'turquoise',
+            'mint': 'mint',
+            'lavender': 'lavender',
+            'pomegranate': 'pomegranate',
+            'sand': 'sand',
+            'olive': 'olive',
+            'malachite': 'malachite',
+            'copper': 'copper',
+            'ivory': 'ivory',
         }
 
         # Присваиваем value на основе label
@@ -378,6 +378,7 @@ class ProductSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
 
+        # Обработка main_characteristics
         main_characteristics = representation.get('main_characteristics', [])
         if isinstance(main_characteristics, list):
             updated_characteristics = []
@@ -387,14 +388,27 @@ class ProductSerializer(serializers.ModelSerializer):
                 updated_characteristics.append(characteristic)
             representation['main_characteristics'] = updated_characteristics
 
+        # Условие для wholesaler
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             user = request.user
             if user.role == 'wholesaler':
                 representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
-                representation['promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+                representation[
+                    'promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+
+        # Добавляем логику для поля color
+        color_instance = getattr(instance, 'color', None)
+        if color_instance:
+            # Если `color` связано с другой моделью
+            representation['color'] = color_instance.value  # value — поле на английском в модели Color
+        else:
+            # Если просто строковое поле
+            representation['color'] = instance.color if instance.color else None
 
         return representation
+
+
 class ProductShortSerializer(serializers.ModelSerializer):
     avg_rating = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
