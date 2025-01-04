@@ -1,6 +1,7 @@
-from rest_framework.parsers import MultiPartParser, FormParser
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Brand, Category, Color
+from .serializers import ProductCreateSerializer
 import logging
 from decimal import Decimal
 from rest_framework.permissions import IsAdminUser
@@ -436,6 +437,17 @@ class ProductPopularView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+def get_object_by_value(model, value):
+    """Функция для получения объекта модели по значению"""
+    if value:
+        try:
+            # Преобразуем value в верхний регистр для корректного поиска
+            return model.objects.get(value=value.upper())  # Ищем в базе по значению в верхнем регистре
+        except model.DoesNotExist:
+            return None
+    return None
+
+
 
 class ProductCreateView(generics.CreateAPIView):
     queryset = Product.objects.all()
@@ -483,35 +495,32 @@ class ProductCreateView(generics.CreateAPIView):
         }
 
         # Получаем данные из запроса
-        request_data = request.data.copy()
+        request_data = request.data
         brand_value = request_data.get('brand')  # строка, которую отправляет фронт
         category_value = request_data.get('category')  # строка, которую отправляет фронт
         color_value = request_data.get('color')  # строка, которую отправляет фронт
 
         # Проверка и поиск бренда по значению (value)
         if brand_value:
-            try:
-                brand = Brand.objects.get(value=brand_value)  # ищем по значению value
-            except Brand.DoesNotExist:
-                return Response({"error": "Brand with the specified value does not exist"},
+            brand = get_object_by_value(Brand, brand_value)
+            if not brand:
+                return Response({"error": f"Brand with the specified value '{brand_value}' does not exist"},
                                 status=status.HTTP_400_BAD_REQUEST)
             request_data['brand'] = brand  # заменяем value на сам объект
 
         # Проверка и поиск категории по значению (value)
         if category_value:
-            try:
-                category = Category.objects.get(value=category_value)  # ищем по значению value
-            except Category.DoesNotExist:
-                return Response({"error": "Category with the specified value does not exist"},
+            category = get_object_by_value(Category, category_value)
+            if not category:
+                return Response({"error": f"Category with the specified value '{category_value}' does not exist"},
                                 status=status.HTTP_400_BAD_REQUEST)
             request_data['category'] = category  # заменяем value на сам объект
 
         # Проверка и поиск цвета по значению (value)
         if color_value:
-            try:
-                color = Color.objects.get(value=color_value)  # ищем по значению value
-            except Color.DoesNotExist:
-                return Response({"error": "Color with the specified value does not exist"},
+            color = get_object_by_value(Color, color_value)
+            if not color:
+                return Response({"error": f"Color with the specified value '{color_value}' does not exist"},
                                 status=status.HTTP_400_BAD_REQUEST)
             request_data['color'] = color  # заменяем value на сам объект
 
@@ -522,6 +531,7 @@ class ProductCreateView(generics.CreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
