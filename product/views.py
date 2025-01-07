@@ -296,6 +296,8 @@ class ProductListView(generics.ListAPIView):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
+
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
@@ -329,19 +331,59 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         operation_description="Этот эндпоинт позволяет получить, обновить или удалить продукт по ID."
     )
     def get(self, request, *args, **kwargs):
-        product = self.get_object()  # Получаем объект продукта
-        # Сериализация данных продукта с учетом роли пользователя
+        product = self.get_object()
         data = self.get_product_data(product, request)
 
-        # Преобразуем category, color и brand в label
+        # Проверяем значение product.color
+        print(f"DEBUG: product.color = {product.color}")
+
         data['category'] = product.category.label if product.category else None
-        data['color'] = product.color.label if product.color else None
+        data['color'] = self.get_color_value(product.color.label if product.color else None)
         data['brand'] = product.brand.label if product.brand else None
 
-        # Получаем похожие товары
         data['similar_products'] = self.get_similar_products(product)
-
         return Response(data)
+
+    def get_color_value(self, label):
+        """
+        Преобразует label цвета в value на английском.
+        """
+        COLORS = [
+            {"label": "белый", "value": "white"},
+            {"label": "черный", "value": "black"},
+            {"label": "красный", "value": "red"},
+            {"label": "синий", "value": "blue"},
+            {"label": "зеленый", "value": "green"},
+            {"label": "желтый", "value": "yellow"},
+            {"label": "оранжевый", "value": "orange"},
+            {"label": "пурпурный", "value": "purple"},
+            {"label": "розовый", "value": "pink"},
+            {"label": "серый", "value": "gray"},
+            {"label": "коричневый", "value": "brown"},
+            {"label": "бежевая", "value": "beige"},
+            {"label": "фиолетовый", "value": "violet"},
+            {"label": "голубой", "value": "light blue"},
+            {"label": "бирюзовый", "value": "turquoise"},
+            {"label": "мятный", "value": "mint"},
+            {"label": "лавандовый", "value": "lavender"},
+            {"label": "гранатовый", "value": "pomegranate"},
+            {"label": "песочный", "value": "sand"},
+            {"label": "оливковый", "value": "olive"},
+            {"label": "малахитовый", "value": "malachite"},
+            {"label": "медный", "value": "copper"},
+            {"label": "слоновая кость", "value": "ivory"},
+        ]
+
+        if label is None:
+            return None
+
+        for color in COLORS:
+            if color["label"] == label:
+                return color["value"]
+
+        # Если label не найден
+        print(f"DEBUG: Unknown label '{label}'")
+        return None
 
     @swagger_auto_schema(
         tags=['product'],
@@ -608,6 +650,7 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
             return Response({"detail": "Комментарий не найден."}, status=status.HTTP_404_NOT_FOUND)
         return super().handle_exception(exc)
 
+
 class BannerView(APIView):  # Изменено имя класса
     @swagger_auto_schema(
         operation_description="Получить текущий баннер",
@@ -622,17 +665,30 @@ class BannerView(APIView):  # Изменено имя класса
         return Response(serializer.data)
 
     @swagger_auto_schema(
-        operation_description="Создать новый баннер",
+        operation_description="Добавить или обновить баннер",
         request_body=BannerSerializer,
-        responses={201: BannerSerializer(), 400: "Ошибки валидации данных"},
+        responses={200: BannerSerializer(), 400: "Ошибки валидации данных"},
     )
-    def post(self, request, *args, **kwargs):
-        # Валидация и сохранение данных
-        serializer = BannerSerializer(data=request.data)
+    def put(self, request, *args, **kwargs):
+        # Получаем первый баннер
+        banner = Banner.objects.first()
+
+        # Если баннера нет, создаем новый
+        if banner is None:
+            serializer = BannerSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Если баннер существует, обновляем его
+        serializer = BannerSerializer(banner, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ProductArchiveListView(generics.ListAPIView):
     queryset = Product.objects.filter(is_active=False).order_by('id')
     serializer_class = ProductShortSerializer
