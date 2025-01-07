@@ -607,14 +607,15 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
         if isinstance(exc, Http404):
             return Response({"detail": "Комментарий не найден."}, status=status.HTTP_404_NOT_FOUND)
         return super().handle_exception(exc)
-class Banner(APIView):
+
+class BannerView(APIView):  # Изменено имя класса
     @swagger_auto_schema(
         operation_description="Получить текущий баннер",
         responses={200: BannerSerializer()},
     )
     def get(self, request, *args, **kwargs):
-        # Получаем первый баннер (или любой другой баннер, если есть условие)
-        banner = Banner.objects.first()  # Или используйте другой способ поиска
+        # Получаем первый баннер
+        banner = Banner.objects.first()
         if banner is None:
             return Response({"detail": "Banner not found"}, status=status.HTTP_404_NOT_FOUND)
         serializer = BannerSerializer(banner)
@@ -626,13 +627,12 @@ class Banner(APIView):
         responses={201: BannerSerializer(), 400: "Ошибки валидации данных"},
     )
     def post(self, request, *args, **kwargs):
-        # Для создания баннера просто валидируем и сохраняем
+        # Валидация и сохранение данных
         serializer = BannerSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 class ProductArchiveListView(generics.ListAPIView):
     queryset = Product.objects.filter(is_active=False).order_by('id')
     serializer_class = ProductShortSerializer
