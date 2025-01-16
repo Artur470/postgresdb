@@ -667,24 +667,23 @@ class BannerView(APIView):  # Изменено имя класса
     @swagger_auto_schema(
         operation_description="Добавить или обновить баннер",
         request_body=BannerSerializer,
-        responses={200: BannerSerializer(), 400: "Ошибки валидации данных"},
+        responses={
+            200: BannerSerializer(),
+            201: BannerSerializer(),
+            400: "Ошибки валидации данных",
+        },
     )
     def put(self, request, *args, **kwargs):
-        # Получаем первый баннер
-        banner = Banner.objects.first()
+        # Получаем или создаём первый баннер
+        banner, created = Banner.objects.get_or_create(
+            id=1)  # Используем фиксированный ID, если всегда нужен один баннер
 
-        # Если баннера нет, создаем новый
-        if banner is None:
-            serializer = BannerSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        # Если баннер существует, обновляем его
-        serializer = BannerSerializer(banner, data=request.data, partial=True)
+        # Обновляем или создаём данные
+        serializer = BannerSerializer(banner, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            if created:
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
