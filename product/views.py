@@ -651,7 +651,8 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().handle_exception(exc)
 
 
-class BannerView(APIView):  # Изменено имя класса
+
+class BannerView(APIView):
     @swagger_auto_schema(
         operation_description="Получить текущий баннер",
         responses={200: BannerSerializer()},
@@ -674,17 +675,22 @@ class BannerView(APIView):  # Изменено имя класса
         },
     )
     def put(self, request, *args, **kwargs):
-        # Получаем или создаём первый баннер
-        banner, created = Banner.objects.get_or_create(
-            id=1)  # Используем фиксированный ID, если всегда нужен один баннер
+        # Получаем первый баннер, если он существует
+        banner = Banner.objects.first()
 
-        # Обновляем или создаём данные
-        serializer = BannerSerializer(banner, data=request.data)
+        # Если баннер уже существует, обновляем его
+        if banner:
+            serializer = BannerSerializer(banner, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Если баннера нет, создаём новый
+        serializer = BannerSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            if created:
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
