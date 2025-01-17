@@ -655,7 +655,7 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
 class BannerView(APIView):
     @swagger_auto_schema(
         operation_description="Получить текущий баннер",
-        responses={200: BannerSerializer()},
+        responses={200: BannerSerializer(), 404: "Banner not found"},
     )
     def get(self, request, *args, **kwargs):
         # Получаем первый баннер
@@ -663,11 +663,21 @@ class BannerView(APIView):
         if banner is None:
             return Response({"detail": "Banner not found"}, status=status.HTTP_404_NOT_FOUND)
         serializer = BannerSerializer(banner)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
         operation_description="Добавить или обновить баннер",
-        request_body=BannerSerializer,
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["image"],
+            properties={
+                "image": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format="binary",
+                    description="Файл изображения для баннера",
+                ),
+            },
+        ),
         responses={
             200: BannerSerializer(),
             201: BannerSerializer(),
@@ -675,25 +685,21 @@ class BannerView(APIView):
         },
     )
     def put(self, request, *args, **kwargs):
-        # Получаем первый баннер, если он существует
+        # Проверяем наличие баннера
         banner = Banner.objects.first()
 
-        # Если баннер уже существует, обновляем его
+        # Если баннер есть, обновляем
         if banner:
-            serializer = BannerSerializer(banner, data=request.data)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer = BannerSerializer(banner, data=request.data, partial=True)
+        else:  # Если баннера нет, создаём
+            serializer = BannerSerializer(data=request.data)
 
-        # Если баннера нет, создаём новый
-        serializer = BannerSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            status_code = status.HTTP_200_OK if banner else status.HTTP_201_CREATED
+            return Response(serializer.data, status=status_code)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 class ProductArchiveListView(generics.ListAPIView):
     queryset = Product.objects.filter(is_active=False).order_by('id')
     serializer_class = ProductShortSerializer
