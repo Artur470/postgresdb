@@ -2,7 +2,6 @@
 """Django's management-line utility for administrative tasks."""
 import os
 import sys
-from decouple import config
 import cloudinary
 import cloudinary.api
 from decouple import config

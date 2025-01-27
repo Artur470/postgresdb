@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db.models import Sum
 from rest_framework import serializers
 
-from .models import Cart, CartItem, Order
+from .models import Cart, CartItem, Order, User
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -136,10 +136,9 @@ class CartItemsSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
 
-
     class Meta:
         model = Order
-        fields = ['user', 'cart', 'total_price', 'address', 'by_cash', 'by_card']
+        fields = ['user', 'cart', 'total_price', 'address', 'by_card', 'by_cash']
 
     def create(self, validated_data):
         cart = validated_data.get('cart')
@@ -159,3 +158,37 @@ class OrderSerializer(serializers.ModelSerializer):
         order.send_order_email()  # Отправка уведомления на почту
 
         return order
+
+
+class ApplicationSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    quantity = serializers.CharField(source='user.username', read_only=True)
+    total_quantity = serializers.SerializerMethodField()  # Общее количество товаров
+    total_price = serializers.SerializerMethodField()  # Итоговая цена корзины
+
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'username',
+            'ordered_at',
+            'total_quantity',
+            'total_price'
+        ]
+
+    def get_total_quantity(self, obj):
+        """Возвращает общее количество всех товаров в корзине."""
+        return obj.cartitem_set.aggregate(total=Sum('quantity'))['total'] or 0
+
+    def get_total_price(self, obj):
+        """Рассчитывает общую цену корзины с учетом скидок и роли пользователя."""
+        total_price = Decimal('0.00')
+        user = self.context.get('request').user if self.context.get('request') else None
+
+        if user:
+            for item in obj.cartitem_set.select_related('product').all():
+                product_price = self.calculate_product_price(item.product, user)  # Цена с учетом скидки
+                total_price += product_price * item.quantity  # Умножаем на количество товара
+
+        return round(total_price, 2)  # Округляем до 2 знаков

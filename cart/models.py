@@ -75,6 +75,7 @@ class Order(models.Model):
     address = models.CharField(max_length=255)
     ordered_at = models.DateTimeField(auto_now_add=True)
     application = models.BooleanField(default=False)
+
     def __str__(self):
         return f"Order {self.id} by {self.user.email}"
 
@@ -83,6 +84,17 @@ class Order(models.Model):
         self.cart.cartitem_set.all().delete()
         self.cart.total_price = 0
         self.cart.save()
+
+    def update_totals(self):
+        """Обновление итоговой суммы и подытога"""
+        if self.cart.cartitem_set.exists():
+            self.total_price = sum(item.total_price() for item in self.cart.cartitem_set.all())
+        else:
+            self.total_price = 0  # Если корзина пуста, установите 0
+        # Обновите корзину, чтобы сумма корзины была актуальной
+        self.cart.total_price = self.total_price
+        self.cart.save()  # Обновите корзину
+        self.save()  # Сохраните заказ с новой общей суммой
 
     def send_order_email(self):
         try:
@@ -97,7 +109,7 @@ class Order(models.Model):
                       f'Имя пользователя: {self.user.first_name}, {self.user.last_name}\n' \
                       f'Номер телефона пользователя: {self.user.number}\n' \
                       f'Адрес: {self.address}\n' \
-                      f'Способ оплаты: {self.payment_method.name if self.payment_method else "Не указан"}\n' \
+                      f'Способ оплаты: {self.by_card if self.by_cash else "Не указан"}\n' \
                       f'Окончательная цена: {self.total_price}\n' \
                       f'Время заказа: {order_time_str}\n\n'
 
@@ -120,6 +132,8 @@ class Order(models.Model):
             admin_email = 'homelife.site.kg@gmail.com'
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [admin_email])
 
+            self.application = True
+            self.save()
 
         except Exception as e:
             # Логирование ошибки или отправка уведомления о проблемах с отправкой email

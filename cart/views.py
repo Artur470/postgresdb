@@ -12,7 +12,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from product.models import Product
 from .models import Cart, CartItem, Order
-from .serializers import CartItemsSerializer, OrderSerializer
+from .serializers import CartItemsSerializer, OrderSerializer, ApplicationSerializer
 
 
 class CartView(APIView):
@@ -382,8 +382,10 @@ class CartView(APIView):
             'totalPrice': cart.total_price,
         }, status=204)
 
+
 class CreateOrderView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['order'],
@@ -392,9 +394,10 @@ class CreateOrderView(APIView):
             type=openapi.TYPE_OBJECT,
             properties={
                 'address': openapi.Schema(type=openapi.TYPE_STRING, description="Адрес доставки"),
-                'payment_method': openapi.Schema(type=openapi.TYPE_INTEGER, description="")
+                'by_card': openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Оплата картой"),
+                'by_cash': openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Оплата наличными")
             },
-            required=['address', 'payment_method']
+            required=['address', 'by_card', 'by_cash']
         ),
         responses={
             201: openapi.Response(description="Заказ создан"),
@@ -409,7 +412,7 @@ class CreateOrderView(APIView):
             return Response({'error': 'Cart not found'}, status=400)
 
         # Уменьшаем количество товара на складе при оформлении заказа
-        for cart_item in cart.cartitem_set.all():
+        for cart_item in cart.items.all():
             product = cart_item.product
             product.quantity -= cart_item.quantity
             product.save()
@@ -417,8 +420,10 @@ class CreateOrderView(APIView):
         order = Order.objects.create(
             user=user,
             address=request.data['address'],
-            payment_method=PaymentMethod.objects.get(id=request.data['payment_method']),
-            cart=cart
+            by_card=request.data['by_card'],
+            by_cash=request.data['by_cash'],
+            cart=cart,
+            total_price = cart.total_price
         )
 
         cart.ordered = True
@@ -426,3 +431,16 @@ class CreateOrderView(APIView):
 
         return Response(OrderSerializer(order).data, status=201)
 
+
+class ApplicationView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = ApplicationSerializer
+
+    def get(self, request, *args, **kwargs):
+        # Фильтруем заказы, где поле 'application' равно True
+        orders = Order.objects.filter(application=True)
+        # Сериализуем отфильтрованные заказы
+        serializer = self.serializer_class(orders, many=True)
+        return Response(serializer.data)
