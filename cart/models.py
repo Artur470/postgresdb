@@ -57,22 +57,24 @@ class CartItem(models.Model):
         return f"{self.user.first_name} {self.product.title}"
 
 
-class PaymentMethod(models.Model):
-    name = models.CharField(max_length=50)  # Например: "Card", "Cash", "Bank Transfer"
-    description = models.TextField(blank=True, null=True)  # Дополнительное описание (по желанию)
+# class PaymentMethod(models.Model):
+#     name = models.CharField(max_length=50)  # Например: "Card", "Cash", "Bank Transfer"
+#     description = models.TextField(blank=True, null=True)  # Дополнительное описание (по желанию)
 
-    def __str__(self):
-        return self.name
-
+    # def __str__(self):
+    #     return self.name
+    #
 
 class Order(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
-    payment_method = models.ForeignKey(PaymentMethod, null=True, blank=True, on_delete=models.SET_NULL)
+    # payment_method = models.ForeignKey(PaymentMethod, null=True, blank=True, on_delete=models.SET_NULL)
+    by_card = models.BooleanField(default=False)
+    by_cash = models.BooleanField(default=False)
     total_price = models.FloatField()
     address = models.CharField(max_length=255)
     ordered_at = models.DateTimeField(auto_now_add=True)
-
+    application = models.BooleanField(default=False)
     def __str__(self):
         return f"Order {self.id} by {self.user.email}"
 
@@ -118,6 +120,8 @@ class Order(models.Model):
             admin_email = 'homelife.site.kg@gmail.com'
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [admin_email])
 
+
         except Exception as e:
             # Логирование ошибки или отправка уведомления о проблемах с отправкой email
             print(f"Ошибка при отправке email: {e}")
+

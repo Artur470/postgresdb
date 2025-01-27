@@ -579,16 +579,12 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
 
-
 class BannerSerializer(serializers.ModelSerializer):
-    image = serializers.SerializerMethodField()
-
     class Meta:
         model = Banner
         fields = ('id', 'image')
 
-    def get_image(self, obj):
-        # Если изображение существует, генерируем полный URL
-        if obj.image:
-            return f"https://res.cloudinary.com/{settings.CLOUDINARY_CLOUD_NAME}/image/upload/{obj.image}"
-        return None
+    def validate_image(self, value):
+        if not value:
+            raise serializers.ValidationError("Изображение не может быть пустым.")
+        return value

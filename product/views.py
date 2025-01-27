@@ -651,17 +651,22 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().handle_exception(exc)
 
 
-
 class BannerView(APIView):
     @swagger_auto_schema(
         operation_description="Получить текущий баннер",
-        responses={200: BannerSerializer(), 404: "Banner not found"},
+        responses={
+            200: BannerSerializer(),
+            404: "Banner not found"
+        },
     )
     def get(self, request, *args, **kwargs):
-        # Получаем первый баннер
+        """
+        Возвращает текущий баннер.
+        """
         banner = Banner.objects.first()
-        if banner is None:
+        if not banner:
             return Response({"detail": "Banner not found"}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = BannerSerializer(banner)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -685,21 +690,27 @@ class BannerView(APIView):
         },
     )
     def put(self, request, *args, **kwargs):
-        # Проверяем наличие баннера
+        """
+        Обновляет существующий баннер или создаёт новый, если его нет.
+        """
         banner = Banner.objects.first()
 
-        # Если баннер есть, обновляем
+        # Если баннер существует, обновляем
         if banner:
             serializer = BannerSerializer(banner, data=request.data, partial=True)
-        else:  # Если баннера нет, создаём
+            success_status = status.HTTP_200_OK
+        else:
+            # Если баннера нет, создаём новый
             serializer = BannerSerializer(data=request.data)
+            success_status = status.HTTP_201_CREATED
 
         if serializer.is_valid():
             serializer.save()
-            status_code = status.HTTP_200_OK if banner else status.HTTP_201_CREATED
-            return Response(serializer.data, status=status_code)
+            return Response(serializer.data, status=success_status)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ProductArchiveListView(generics.ListAPIView):
     queryset = Product.objects.filter(is_active=False).order_by('id')
     serializer_class = ProductShortSerializer

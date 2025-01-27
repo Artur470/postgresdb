@@ -1,21 +1,19 @@
-from django.shortcuts import get_object_or_404
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from rest_framework.decorators import action
-from django.db.models import F, Sum, DecimalField, ExpressionWrapper
-from django.http import Http404
-from django.db.models import F, ExpressionWrapper, FloatField
-from .models import Cart, CartItem, Order, PaymentMethod
-from product.models import Product
-from .serializers import CartItemsSerializer, OrderSerializer
-from django.db.models import Sum, F
-from .serializers import CartItemsSerializer, OrderSerializer
 from decimal import Decimal
+
+from django.http import Http404
+from django.shortcuts import get_object_or_404
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+
+from product.models import Product
+from .models import Cart, CartItem, Order
+from .serializers import CartItemsSerializer, OrderSerializer
+
 
 class CartView(APIView):
     permission_classes = [IsAuthenticated]
@@ -389,12 +387,12 @@ class CreateOrderView(APIView):
 
     @swagger_auto_schema(
         tags=['order'],
-        operation_description="Оформить заказ. Введите адрес и способ оплаты: 1 - наличные, 2 - карта.",
+        operation_description="",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
                 'address': openapi.Schema(type=openapi.TYPE_STRING, description="Адрес доставки"),
-                'payment_method': openapi.Schema(type=openapi.TYPE_INTEGER, description="Способ оплаты (1 - наличные, 2 - карта)")
+                'payment_method': openapi.Schema(type=openapi.TYPE_INTEGER, description="")
             },
             required=['address', 'payment_method']
         ),
