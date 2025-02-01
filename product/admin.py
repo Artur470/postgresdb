@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, Banner, Color
+from .models import Category, Product, Banner, Color, Brand
 from django.core.exceptions import ValidationError
 from django.forms import JSONField, ModelForm
 
@@ -81,3 +81,4 @@ class ProductAdmin(admin.ModelAdmin):
 admin.site.register(Category)
 admin.site.register(Banner)
 admin.site.register(Color)
+admin.site.register(Brand)

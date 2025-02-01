@@ -7,12 +7,12 @@ from django.conf import settings
 from cloudinary.models import CloudinaryField
 from rest_framework import serializers
 from .models import Product, Brand, Category, Color
+
 class CategorySerializer(serializers.ModelSerializer):
     value = serializers.SerializerMethodField()
-    label = serializers.SerializerMethodField()
 
     class Meta:
-        model = Category
+        model = Category  # Обратите внимание, что вы используете модель Category, а не Brand
         fields = ['label', 'value']
 
     def get_value(self, obj):
@@ -49,17 +49,17 @@ class CategorySerializer(serializers.ModelSerializer):
             'Хлебопечка': 'bread maker',
         }
 
+        # Если значение value уже есть, возвращаем его
         if obj.value:
-            return translation.get(obj.value, obj.value)
-        return translation.get(obj.label.lower(), obj.label.lower())
+            return translation.get(obj.value, obj.value).lower()
 
-    def get_label(self, obj):
-        # Возвращаем label с первой заглавной буквой
-        return obj.label.capitalize()
+        # Если value нет, присваиваем его на основе label
+        return translation.get(obj.label, obj.label).lower()
 
     def create(self, validated_data):
         label = validated_data.get('label')
 
+        # Словарь перевода
         translation = {
             'Холодильник': 'refrigerator',
             'Стиральная машина': 'washing machine',
@@ -93,8 +93,12 @@ class CategorySerializer(serializers.ModelSerializer):
             'Хлебопечка': 'bread maker',
         }
 
-        validated_data['value'] = translation.get(label.lower(), label.lower())
+        # Присваиваем value на основе label
+        validated_data['value'] = translation.get(label, label).lower()  # Сохраняем значение в нижнем регистре
+
+        # Создаем объект модели
         return super().create(validated_data)
+
 
 class ColorSerializer(serializers.ModelSerializer):
     value = serializers.SerializerMethodField()
