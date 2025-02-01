@@ -1,5 +1,5 @@
 from decimal import Decimal
-
+from django.db.models import Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
@@ -9,10 +9,24 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from django.db.models import Sum, F
+from rest_framework.decorators import api_view
 from product.models import Product
-from .models import Cart, CartItem, Order
-from .serializers import CartItemsSerializer, OrderSerializer, ApplicationSerializer
+from .models import Cart, CartItem
+from .serializers import (OrderSummarySerializer)
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .models import  CartItem
+from rest_framework import serializers, status
+from rest_framework.response import Response
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import   CartItem
+from django.core.mail import send_mail
+from django.http import HttpResponse
+from django.conf import settings
+
 
 
 class CartView(APIView):
@@ -383,64 +397,84 @@ class CartView(APIView):
         }, status=204)
 
 
-class CreateOrderView(APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-
-    @swagger_auto_schema(
-        tags=['order'],
-        operation_description="",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'address': openapi.Schema(type=openapi.TYPE_STRING, description="Адрес доставки"),
-                'by_card': openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Оплата картой"),
-                'by_cash': openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Оплата наличными")
-            },
-            required=['address', 'by_card', 'by_cash']
-        ),
-        responses={
-            201: openapi.Response(description="Заказ создан"),
-            400: openapi.Response(description="Ошибка создания заказа")
-        }
-    )
-    def post(self, request):
-        user = request.user
-        cart = Cart.objects.filter(user=user, ordered=False).first()
-
-        if not cart:
-            return Response({'error': 'Cart not found'}, status=400)
-
-        # Уменьшаем количество товара на складе при оформлении заказа
-        for cart_item in cart.items.all():
-            product = cart_item.product
-            product.quantity -= cart_item.quantity
-            product.save()
-
-        order = Order.objects.create(
-            user=user,
-            address=request.data['address'],
-            by_card=request.data['by_card'],
-            by_cash=request.data['by_cash'],
-            cart=cart,
-            total_price = cart.total_price
-        )
-
-        cart.ordered = True
-        cart.save()
-
-        return Response(OrderSerializer(order).data, status=201)
 
 
-class ApplicationView(APIView):
-
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-    serializer_class = ApplicationSerializer
-
-    def get(self, request, *args, **kwargs):
-        # Фильтруем заказы, где поле 'application' равно True
-        orders = Order.objects.filter(application=True)
-        # Сериализуем отфильтрованные заказы
-        serializer = self.serializer_class(orders, many=True)
-        return Response(serializer.data)
+#
+# class OrderView(APIView):
+#     permission_classes = [IsAuthenticated]
+#     authentication_classes = [JWTAuthentication]
+#
+#     @swagger_auto_schema(
+#         tags=['order'],
+#         operation_description="Получение данных корзины пользователя",
+#         responses={
+#             200: openapi.Response(
+#                 description="Данные корзины",
+#                 examples={
+#                     'application/json': {
+#                         "total_quantity": 24,
+#                         "subtotal": 72000,
+#                         "totalPrice": 71976
+#                     }
+#                 },
+#                 schema=openapi.Schema(
+#                     type=openapi.TYPE_OBJECT,
+#                     properties={
+#                         'total_quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
+#                                                          description='Общее количество товаров в корзине'),
+#                         'subtotal': openapi.Schema(type=openapi.TYPE_INTEGER,
+#                                                    description='Общая сумма без учета скидки'),
+#                         'totalPrice': openapi.Schema(type=openapi.TYPE_INTEGER,
+#                                                      description='Общая сумма с учетом скидки'),
+#                     },
+#                     required=['total_quantity', 'subtotal', 'totalPrice']
+#                 )
+#             ),
+#             404: openapi.Response(description="Корзина не найдена"),
+#             401: openapi.Response(description="Ошибка авторизации"),
+#             500: openapi.Response(description="Ошибка сервера")
+#         }
+#     )
+#     def get(self, request):
+#         user = request.user
+#         # Проверка роли через поле `role` у пользователя
+#         is_wholesale = user.role == 'wholesaler'  # Проверка, является ли пользователь оптовиком
+#
+#         # Получаем корзину пользователя
+#         cart = Cart.objects.filter(user=user, ordered=False).first()
+#
+#         if not cart:
+#             return Response({'error': 'Cart not found'}, status=404)
+#
+#         # Переменные для подсчета
+#         total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+#         subtotal = Decimal(0)  # Общая сумма без скидки
+#         total_price = Decimal(0)  # Итоговая стоимость с учетом скидки
+#
+#         # Обрабатываем каждый элемент корзины
+#         for item in cart.items.all():
+#             product = item.product
+#             product_price = Decimal(product.price)  # Обычная цена товара
+#             product_promotion = product.promotion  # Скидка товара, если есть
+#
+#             # Если пользователь оптовик, используем оптовую цену и скидку
+#             if is_wholesale:
+#                 product_price = Decimal(product.wholesale_price)  # Оптовая цена
+#                 product_promotion = product.wholesale_promotion  # Оптовая скидка
+#
+#             # Рассчитываем цену с учетом скидки
+#             if product_promotion:
+#                 discounted_price = Decimal(product_promotion)  # Цена товара с учетом скидки
+#             else:
+#                 discounted_price = product_price  # Если скидки нет, используем обычную цену
+#
+#             # Обновляем итоговые значения
+#             subtotal += product_price * item.quantity  # Сумма без скидки
+#             total_price += discounted_price * item.quantity  # Итоговая сумма с учетом скидки
+#
+#         return Response({
+#             "total_quantity": total_quantity,
+#             "subtotal": int(subtotal),  # Цена без скидки
+#             "totalPrice": int(total_price),  # Итоговая цена с учетом скидки
+#         })
+#

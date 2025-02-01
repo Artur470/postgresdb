@@ -1,14 +1,17 @@
 from decimal import Decimal
-
+from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
-
-from .models import Cart, CartItem, Order, User
+from .models import Cart, CartItem
+from rest_framework import serializers
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import   CartItem
 
 
 class CartSerializer(serializers.ModelSerializer):
     total_price = serializers.SerializerMethodField()  # Итоговая цена корзины
-    total_quantity = serializers.SerializerMethodField()  # Общее количество товаров
+    total_quantity = serializers.IntegerField()  # Общее количество товаров
     cart_items = serializers.SerializerMethodField()  # Детализация товаров в корзине
     subtotal = serializers.SerializerMethodField()  # Стоимость до применения скидок
 
@@ -134,61 +137,25 @@ class CartItemsSerializer(serializers.ModelSerializer):
 #         model = PaymentMethod
 #         fields = ['id', 'name']
 
-class OrderSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Order
-        fields = ['user', 'cart', 'total_price', 'address', 'by_card', 'by_cash']
-
-    def create(self, validated_data):
-        cart = validated_data.get('cart')
-
-        # Проверка на пустую корзину
-        if cart.cartitem_set.count() == 0:
-            raise serializers.ValidationError("Корзина пуста. Невозможно создать заказ.")
-
-        order = Order.objects.create(**validated_data)
-
-        # Уменьшение количества товаров на складе при создании заказа
-        for item in order.cart.cartitem_set.all():
-            item.product.quantity -= item.quantity
-            item.product.save()
-
-        order.clear_user_cart()  # Очистка корзины пользователя после создания заказа
-        order.send_order_email()  # Отправка уведомления на почту
-
-        return order
-
-
-class ApplicationSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-    quantity = serializers.CharField(source='user.username', read_only=True)
-    total_quantity = serializers.SerializerMethodField()  # Общее количество товаров
-    total_price = serializers.SerializerMethodField()  # Итоговая цена корзины
-
-
-    class Meta:
-        model = Order
-        fields = [
-            'id',
-            'username',
-            'ordered_at',
-            'total_quantity',
-            'total_price'
-        ]
+class OrderSummarySerializer(serializers.Serializer):
+    total_quantity = serializers.IntegerField()  # Общее количество товаров
+    subtotal = serializers.FloatField()  # Сумма до скидок
+    totalPrice = serializers.FloatField()  # Итоговая цена
 
     def get_total_quantity(self, obj):
-        """Возвращает общее количество всех товаров в корзине."""
-        return obj.cartitem_set.aggregate(total=Sum('quantity'))['total'] or 0
+        # Суммируем количество товаров в корзине
+        return obj.cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity']
+
+    def get_subtotal(self, obj):
+        # Получаем сумму до скидок
+        return round(obj.cart.subtotal, 2)  # Округляем до 2 знаков
 
     def get_total_price(self, obj):
-        """Рассчитывает общую цену корзины с учетом скидок и роли пользователя."""
-        total_price = Decimal('0.00')
-        user = self.context.get('request').user if self.context.get('request') else None
+        # Получаем итоговую цену с учетом скидки
+        return round(obj.cart.total_price, 2)  # Округляем до 2 знаков
 
-        if user:
-            for item in obj.cartitem_set.select_related('product').all():
-                product_price = self.calculate_product_price(item.product, user)  # Цена с учетом скидки
-                total_price += product_price * item.quantity  # Умножаем на количество товара
+    class Meta:
+        fields = ('total_quantity', 'subtotal', 'totalPrice')
 
-        return round(total_price, 2)  # Округляем до 2 знаков
+
+

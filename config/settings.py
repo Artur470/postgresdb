@@ -12,6 +12,7 @@ import dj_database_url
 import cloudinary
 from decouple import config
 # import cloudinary.uploader
+from decouple import config
 
 from datetime import timedelta
 from drf_yasg import openapi
@@ -247,11 +248,11 @@ CORS_ALLOW_METHODS = [
     'PATCH',
 ]
 
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
-    'API_KEY': config('CLOUDINARY_API_KEY'),
-    'API_SECRET': config('CLOUDINARY_API_SECRET'),
-}
+CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = config('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = config('CLOUDINARY_API_SECRET')
+
+CLOUDINARY_URL = f'https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/'
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 CORS_ALLOW_ALL_ORIGINS = True

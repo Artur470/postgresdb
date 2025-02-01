@@ -580,11 +580,11 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class BannerSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
     class Meta:
         model = Banner
         fields = ('id', 'image')
 
-    def validate_image(self, value):
-        if not value:
-            raise serializers.ValidationError("Изображение не может быть пустым.")
-        return value
+    def get_image(self, obj):
+        # Используем встроенный метод .url для получения правильного URL
+        return obj.image.url
