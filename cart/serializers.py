@@ -6,7 +6,8 @@ from .models import Cart, CartItem
 from rest_framework import serializers
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import   CartItem
+from .models import   CartItem, Order
+
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -158,4 +159,11 @@ class OrderSummarySerializer(serializers.Serializer):
         fields = ('total_quantity', 'subtotal', 'totalPrice')
 
 
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'address', 'by_card', 'by_cash', 'created_at']
+        read_only_fields = ['id', 'created_at']
 

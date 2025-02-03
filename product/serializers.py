@@ -426,6 +426,7 @@ class ProductShortSerializer(serializers.ModelSerializer):
             'title',
             'price',
             'promotion',
+            'is_active',
         ]
 
     def get_avg_rating(self, obj):

@@ -15,3 +15,5 @@ class CustomPagination(pagination.PageNumberPagination):
             'previous': self.get_previous_link(),  # Ссылка на предыдущую страницу
             'results': data  # Сами данные
         })
+
+

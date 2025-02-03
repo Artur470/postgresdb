@@ -11,6 +11,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 
+
 class Cart(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ordered = models.BooleanField(default=False)
@@ -57,9 +58,15 @@ class CartItem(models.Model):
         return f"{self.user.first_name} {self.product.title}"
 
 
-# class PaymentMethod(models.Model):
-#     name = models.CharField(max_length=50)  # Например: "Card", "Cash", "Bank Transfer"
-#     description = models.TextField(blank=True, null=True)  # Дополнительное описание (по желанию)
+class Order(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    address = models.CharField(max_length=255)
+    by_card = models.BooleanField(default=False)
+    by_cash = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    # def __str__(self):
-    #     return self.name
+    def __str__(self):
+        return f"Заказ {self.id} – {self.address}"
+
+
+
