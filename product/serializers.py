@@ -585,7 +585,7 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class BannerSerializer(serializers.ModelSerializer):
-    image = serializers.SerializerMethodField()
+    image = serializers.ImageField()
     class Meta:
         model = Banner
         fields = ('id', 'image')

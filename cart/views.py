@@ -402,11 +402,11 @@ class CartView(APIView):
             'totalPrice': cart.total_price,
         }, status=204)
 
+
+
 def send_order_notification(order, cart):
-
     subject = "Новый заказ на сайте Homelife"
-    items_message = "\nСписок товаров:\n"
-
+    items_message = "Список товаров!\n"
     total_quantity = 0
     for item in cart.items.all():
         total_quantity += item.quantity
@@ -414,30 +414,43 @@ def send_order_notification(order, cart):
         product = item.product
 
         items_message += f"""
-        Товар: {product.title}  
-        Изображение: {product.image1.url if product.image1 else 'Изображение не доступно'}  
-        Количество: {item.quantity}
-        Цена: {item.price} сом
-        Общая стоимость: {item.price * item.quantity} сом
-        """
+    Товар: {product.title}  
+    Изображение: {product.image1.url if product.image1 else 'Изображение не доступно'}  
+    Количество: {item.quantity}
+    Цена: {item.price}c
+    Общая стоимость: {item.price * item.quantity}c
+    """
 
-    # Формируем сообщение
+
     message = f"""
-    номер заказа #{order.id}
-
-    Адрес: {order.address}
-    Онлайн оплата: {"Да" if order.by_card else "Нет"}
-    Оплата наличными через курьера: {"Да" if order.by_cash else "Нет"}
+    Заказ №{order.id}
     Дата заказа: {order.created_at}
 
-    {items_message}
+    Email пользователя: {order.user.email}
+    Имя пользователя: {order.user.username}
+    Телефон пользователя: {order.user.number}
+    Адрес: {order.address}
+    """
 
-    Подитоговая сумма без скидки: {cart.subtotal} сом
-    Итоговая сумма с учетом скидки: {cart.total_price} сом
+
+    if order.by_card:
+        message += "Онлайн оплата: Да\n"
+    if order.by_cash:
+        message += "Оплата наличными через курьера: Да\n"
+
+
+    message += f"\n{items_message}"
+
+
+    message += f"""
+    Итог:
+    Подитоговая сумма без скидки: {cart.subtotal}c
+    Итоговая сумма с учетом скидки: {cart.total_price}c
     Количество товаров: {total_quantity}
     """
 
-    admin_email = "homelife.site.kg@gmail.com"  # Email администратора
+
+    admin_email = "homelife.site.kg@gmail.com"
 
     send_mail(
         subject,
@@ -485,45 +498,42 @@ class OrderView(APIView):
     )
     def get(self, request):
         user = request.user
-        # Проверка роли через поле `role` у пользователя
-        is_wholesale = user.role == 'wholesaler'  # Проверка, является ли пользователь оптовиком
 
-        # Получаем корзину пользователя
+        is_wholesale = user.role == 'wholesaler'
+
         cart = Cart.objects.filter(user=user, ordered=False).first()
 
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
 
-        # Переменные для подсчета
-        total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-        subtotal = Decimal(0)  # Общая сумма без скидки
-        total_price = Decimal(0)  # Итоговая стоимость с учетом скидки
 
-        # Обрабатываем каждый элемент корзины
+        total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        subtotal = Decimal(0)
+        total_price = Decimal(0)
+
+
         for item in cart.items.all():
             product = item.product
-            product_price = Decimal(product.price)  # Обычная цена товара
-            product_promotion = product.promotion  # Скидка товара, если есть
+            product_price = Decimal(product.price)
+            product_promotion = product.promotion
 
-            # Если пользователь оптовик, используем оптовую цену и скидку
             if is_wholesale:
-                product_price = Decimal(product.wholesale_price)  # Оптовая цена
-                product_promotion = product.wholesale_promotion  # Оптовая скидка
+                product_price = Decimal(product.wholesale_price)
+                product_promotion = product.wholesale_promotion
 
-            # Рассчитываем цену с учетом скидки
             if product_promotion:
-                discounted_price = Decimal(product_promotion)  # Цена товара с учетом скидки
+                discounted_price = Decimal(product_promotion)
             else:
-                discounted_price = product_price  # Если скидки нет, используем обычную цену
+                discounted_price = product_price
 
-            # Обновляем итоговые значения
-            subtotal += product_price * item.quantity  # Сумма без скидки
-            total_price += discounted_price * item.quantity  # Итоговая сумма с учетом скидки
+
+            subtotal += product_price * item.quantity
+            total_price += discounted_price * item.quantity
 
         return Response({
             "total_quantity": total_quantity,
-            "subtotal": int(subtotal),  # Цена без скидки
-            "totalPrice": int(total_price),  # Итоговая цена с учетом скидки
+            "subtotal": int(subtotal),
+            "totalPrice": int(total_price),
         })
 
     def post(self, request):
@@ -538,20 +548,27 @@ class OrderView(APIView):
         if not address or by_card is None or by_cash is None:
             return Response({'error': 'Все поля обязательны'}, status=400)
 
-        # Получаем корзину пользователя
+
+        if by_card and by_cash:
+            return Response({'error': "Only one of 'by_card' or 'by_cash' can be True."}, status=400)
+
+        if not by_card and not by_cash:
+            return Response({'error': "At least one of 'by_card' or 'by_cash' must be True."}, status=400)
+
+
         cart = Cart.objects.filter(user=user, ordered=False).first()
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
 
-        # Создаем заказ с привязкой к пользователю
+
         order = Order.objects.create(
-            user=user,  # Привязываем заказ к текущему пользователю
+            user=user,
             address=address,
             by_card=by_card,
             by_cash=by_cash,
         )
 
-        # После оформления можно пометить корзину как "оформленную"
+
         cart.ordered = True
         cart.save()
 
@@ -564,5 +581,5 @@ class OrderView(APIView):
             'address': order.address,
             'by_card': order.by_card,
             'by_cash': order.by_cash,
-            'created_at': order.created_at
+            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y")
         }, status=201)
