@@ -3,11 +3,14 @@ from django.db.models import Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
+from rest_framework.generics import ListAPIView
+
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from .serializers import ApplicationSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db.models import Sum, F
 from rest_framework.decorators import api_view
@@ -459,6 +462,9 @@ def send_order_notification(order, cart):
         [admin_email],
         fail_silently=False,
     )
+    order.application = True
+    order.save(update_fields=["application"])
+
 
 
 class OrderView(APIView):
@@ -583,3 +589,34 @@ class OrderView(APIView):
             'by_cash': order.by_cash,
             'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y")
         }, status=201)
+
+
+
+class ApplicationView(ListAPIView):
+    serializer_class = ApplicationSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_queryset(self):
+        """Получаем только оформленные заказы (историю)"""
+        return Order.objects.filter(user=self.request.user, application=True)
+
+    def get_serializer_context(self):
+        """Передаем total_quantity и total_price в сериализатор"""
+        context = super().get_serializer_context()
+        user = self.request.user
+
+        # Получаем корзину пользователя
+        cart = Cart.objects.filter(user=user, ordered=True).first()
+
+        if cart:
+            total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+            total_price = int(cart.total_price)  # Приводим к int, как в `OrderView`
+        else:
+            total_quantity = 0
+            total_price = 0
+
+        context["total_quantity"] = total_quantity
+        context["total_price"] = total_price
+        return context
+

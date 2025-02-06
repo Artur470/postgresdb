@@ -166,3 +166,27 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ['id', 'address', 'by_card', 'by_cash', 'created_at']
         read_only_fields = ['id', 'created_at']
 
+class ApplicationSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source="user.username")  # Получаем имя пользователя
+    order_created_at = serializers.DateTimeField(source="created_at", format="%Y-%m-%d %H:%M")  # Красиво форматируем дату
+    total_quantity = serializers.SerializerMethodField()  # Добавляем вручную
+    total_price = serializers.SerializerMethodField()  # Добавляем вручную
+    p_method = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = ["id", "user", "order_created_at", "total_quantity", "total_price", "p_method"]  # Только нужные поля
+
+    def get_total_quantity(self, obj):
+        return self.context.get("total_quantity", 0)  # Берем total_quantity из контекста
+
+    def get_total_price(self, obj):
+        return self.context.get("total_price", 0)  # Берем total_price из контекста
+
+    def get_p_method(self, obj):
+        """Возвращает только одно из полей: by_card или by_cash"""
+        if obj.by_card:
+            return "by_card"
+        elif obj.by_cash:
+            return "by_cash"
+        return None  # Если оба False

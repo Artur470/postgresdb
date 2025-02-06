@@ -64,7 +64,7 @@ class Order(models.Model):
     by_card = models.BooleanField(default=False)
     by_cash = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    application = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Заказ {self.id} – {self.address}"

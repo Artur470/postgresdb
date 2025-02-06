@@ -284,6 +284,7 @@ class ProductListView(generics.ListAPIView):
                        Q(price__icontains=search_value) | Q(promotion__icontains=search_value) | \
                        Q(category__label__icontains=search_value)
 
+
         # Применяем фильтры к queryset
         queryset = queryset.filter(filters)
 
