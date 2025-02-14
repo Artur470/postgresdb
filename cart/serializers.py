@@ -165,7 +165,6 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'address', 'by_card', 'by_cash', 'created_at']
         read_only_fields = ['id', 'created_at']
-
 class ApplicationSerializer(serializers.ModelSerializer):
     user = serializers.CharField(source="user.username")  # Получаем имя пользователя
     order_created_at = serializers.DateTimeField(source="created_at", format="%Y-%m-%d %H:%M")  # Красиво форматируем дату

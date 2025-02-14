@@ -542,11 +542,56 @@ class OrderView(APIView):
             "totalPrice": int(total_price),
         })
 
+    @swagger_auto_schema(
+        tags=['order'],
+        operation_description="Создание заказа для пользователя",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['address', 'by_card', 'by_cash'],
+            properties={
+                'address': openapi.Schema(type=openapi.TYPE_STRING, description='Адрес доставки'),
+                'by_card': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Оплата картой'),
+                'by_cash': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Оплата наличными'),
+            }
+        ),
+        responses={
+            201: openapi.Response(
+                description="Заказ успешно создан",
+                examples={
+                    'application/json': {
+                        'message': 'Order created successfully',
+                        'order_id': 123,
+                        'address': '123 Main Street',
+                        'by_card': True,
+                        'by_cash': False,
+                        'created_at': '14:30:00 14-02-2025'
+                    }
+                },
+            ),
+            400: openapi.Response(
+                description="Ошибка валидации",
+                examples={
+                    'application/json': {
+                        'error': 'Все поля обязательны'
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Корзина не найдена",
+                examples={
+                    'application/json': {
+                        'error': 'Cart not found'
+                    }
+                }
+            ),
+            401: openapi.Response(description="Ошибка авторизации"),
+            500: openapi.Response(description="Ошибка сервера")
+        }
+    )
     def post(self, request):
         user = request.user
         data = request.data
 
-        # Проверяем обязательные поля
         address = data.get('address')
         by_card = data.get('by_card')
         by_cash = data.get('by_cash')
@@ -554,18 +599,15 @@ class OrderView(APIView):
         if not address or by_card is None or by_cash is None:
             return Response({'error': 'Все поля обязательны'}, status=400)
 
-
         if by_card and by_cash:
             return Response({'error': "Only one of 'by_card' or 'by_cash' can be True."}, status=400)
 
         if not by_card and not by_cash:
             return Response({'error': "At least one of 'by_card' or 'by_cash' must be True."}, status=400)
 
-
         cart = Cart.objects.filter(user=user, ordered=False).first()
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
-
 
         order = Order.objects.create(
             user=user,
@@ -574,11 +616,9 @@ class OrderView(APIView):
             by_cash=by_cash,
         )
 
-
         cart.ordered = True
         cart.save()
 
-        # Отправляем уведомление админу
         send_order_notification(order, cart)
 
         return Response({
@@ -591,32 +631,45 @@ class OrderView(APIView):
         }, status=201)
 
 
-
 class ApplicationView(ListAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
+    @swagger_auto_schema(
+        tags=['application'],
+        operation_description="Получение списка заявок пользователя (оформленных заказов)",
+        responses={
+            200: ApplicationSerializer(many=True),
+            401: openapi.Response(
+                description="Неавторизованный доступ",
+                examples={
+                    'application/json': {'error': 'Unauthorized'}
+                }
+            ),
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
-        """Получаем только оформленные заказы (историю)"""
         return Order.objects.filter(user=self.request.user, application=True)
 
     def get_serializer_context(self):
-        """Передаем total_quantity и total_price в сериализатор"""
         context = super().get_serializer_context()
         user = self.request.user
-
-        # Получаем корзину пользователя
-        cart = Cart.objects.filter(user=user, ordered=True).first()
+        cart = Cart.objects.filter(user=user, ordered=True).order_by('-id').first()
 
         if cart:
             total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-            total_price = int(cart.total_price)  # Приводим к int, как в `OrderView`
+            total_price = sum(
+                (Decimal(item.product.wholesale_price if user.role == 'wholesaler' else item.product.price) *
+                 item.quantity) for item in cart.items.all()
+            )
         else:
             total_quantity = 0
             total_price = 0
 
         context["total_quantity"] = total_quantity
-        context["total_price"] = total_price
+        context["total_price"] = int(total_price)
         return context
-
