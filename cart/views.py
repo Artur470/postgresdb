@@ -4,7 +4,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
 from rest_framework.generics import ListAPIView
-from rest_framework.exceptions import APIException
+
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -139,46 +139,57 @@ class CartView(APIView):
         })
 
     def post(self, request):
+        data = request.data
+        user = request.user
+        product_id = data.get('product')  # Получаем ID продукта из запроса
+
+        # Логируем ID продукта для отладки
+        print(f"Received product ID: {product_id}")
+
+        # Получаем товар, проверяя, что ID существует
         try:
-            data = request.data
-            user = request.user
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product matching query does not exist.'}, status=404)
+        # Получаем корзину пользователя (или создаем новую, если она не существует)
+        cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
 
-            if not user.is_authenticated:
-                return Response({'error': 'User is not authenticated'}, status=401)
+        # Получаем товар, который был добавлен
+        product = get_object_or_404(Product, id=data.get('product'))
+        quantity = int(data.get('quantity', 1))
 
-            cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
+        # Проверка на корректность количества
+        if quantity <= 0:
+            return Response({'error': 'Quantity must be greater than 0'}, status=400)
 
-            product = get_object_or_404(Product, id=data.get('product'))
-            quantity = int(data.get('quantity', 1))
+        if quantity > product.quantity:
+            return Response({'error': 'Not enough stock available'}, status=400)
 
-            if quantity <= 0:
-                return Response({'error': 'Quantity must be greater than 0'}, status=400)
+        # Рассчитываем цену с учетом промоакции (если она есть)
+        price = product.price
+        promotion = product.promotion or 0
+        if promotion > 0:
+            price *= (1 - promotion / 100)
 
-            if quantity > product.quantity:
-                return Response({'error': 'Not enough stock available'}, status=400)
+        # Добавляем товар в корзину без уменьшения количества на складе
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            defaults={'price': price, 'quantity': quantity, 'user': user}
+        )
 
-            price = product.price
-            promotion = product.promotion or 0
-            if promotion > 0:
-                price *= (1 - promotion / 100)
+        if not created:
+            # Обновляем существующий CartItem
+            cart_item.quantity += quantity
+            cart_item.price = price * cart_item.quantity
+            cart_item.save()
 
-            cart_item, created = CartItem.objects.get_or_create(
-                cart=cart,
-                product=product,
-                defaults={'price': price, 'quantity': quantity, 'user': user}
-            )
+        # Обновляем общую стоимость корзины
+        cart.total_price = sum(item.price * item.quantity for item in CartItem.objects.filter(cart=cart))
+        cart.save()
 
-            if not created:
-                cart_item.quantity += quantity
-                cart_item.price = price * cart_item.quantity
-                cart_item.save()
+        return Response({'success': 'Item added to your cart'})
 
-            cart.total_price = sum(item.price * item.quantity for item in CartItem.objects.filter(cart=cart))
-            cart.save()
-
-            return Response({'success': 'Item added to your cart'})
-        except Exception as e:
-            raise APIException(str(e))
 
 
     @swagger_auto_schema(
