@@ -141,16 +141,6 @@ class CartView(APIView):
     def post(self, request):
         data = request.data
         user = request.user
-        product_id = data.get('product')  # Получаем ID продукта из запроса
-
-        # Логируем ID продукта для отладки
-        print(f"Received product ID: {product_id}")
-
-        # Получаем товар, проверяя, что ID существует
-        try:
-            product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            return Response({'error': 'Product matching query does not exist.'}, status=404)
         # Получаем корзину пользователя (или создаем новую, если она не существует)
         cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
 
