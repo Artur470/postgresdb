@@ -139,9 +139,15 @@ class CartView(APIView):
         })
 
     def post(self, request):
+        print(f"User: {request.user}")
+        print(f"User ID: {request.user.id}")
+
         data = request.data
         user = request.user
-        # Получаем корзину пользователя (или создаем новую, если она не существует)
+
+        if not user.is_authenticated:
+            return Response({'error': 'User is not authenticated'}, status=401)
+
         cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
 
         # Получаем товар, который был добавлен
