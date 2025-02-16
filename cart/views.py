@@ -4,7 +4,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
 from rest_framework.generics import ListAPIView
-
+from rest_framework.exceptions import APIException
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -139,53 +139,46 @@ class CartView(APIView):
         })
 
     def post(self, request):
-        print(f"User: {request.user}")
-        print(f"User ID: {request.user.id}")
+        try:
+            data = request.data
+            user = request.user
 
-        data = request.data
-        user = request.user
+            if not user.is_authenticated:
+                return Response({'error': 'User is not authenticated'}, status=401)
 
-        if not user.is_authenticated:
-            return Response({'error': 'User is not authenticated'}, status=401)
+            cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
 
-        cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
+            product = get_object_or_404(Product, id=data.get('product'))
+            quantity = int(data.get('quantity', 1))
 
-        # Получаем товар, который был добавлен
-        product = get_object_or_404(Product, id=data.get('product'))
-        quantity = int(data.get('quantity', 1))
+            if quantity <= 0:
+                return Response({'error': 'Quantity must be greater than 0'}, status=400)
 
-        # Проверка на корректность количества
-        if quantity <= 0:
-            return Response({'error': 'Quantity must be greater than 0'}, status=400)
+            if quantity > product.quantity:
+                return Response({'error': 'Not enough stock available'}, status=400)
 
-        if quantity > product.quantity:
-            return Response({'error': 'Not enough stock available'}, status=400)
+            price = product.price
+            promotion = product.promotion or 0
+            if promotion > 0:
+                price *= (1 - promotion / 100)
 
-        # Рассчитываем цену с учетом промоакции (если она есть)
-        price = product.price
-        promotion = product.promotion or 0
-        if promotion > 0:
-            price *= (1 - promotion / 100)
+            cart_item, created = CartItem.objects.get_or_create(
+                cart=cart,
+                product=product,
+                defaults={'price': price, 'quantity': quantity, 'user': user}
+            )
 
-        # Добавляем товар в корзину без уменьшения количества на складе
-        cart_item, created = CartItem.objects.get_or_create(
-            cart=cart,
-            product=product,
-            defaults={'price': price, 'quantity': quantity, 'user': user}
-        )
+            if not created:
+                cart_item.quantity += quantity
+                cart_item.price = price * cart_item.quantity
+                cart_item.save()
 
-        if not created:
-            # Обновляем существующий CartItem
-            cart_item.quantity += quantity
-            cart_item.price = price * cart_item.quantity
-            cart_item.save()
+            cart.total_price = sum(item.price * item.quantity for item in CartItem.objects.filter(cart=cart))
+            cart.save()
 
-        # Обновляем общую стоимость корзины
-        cart.total_price = sum(item.price * item.quantity for item in CartItem.objects.filter(cart=cart))
-        cart.save()
-
-        return Response({'success': 'Item added to your cart'})
-
+            return Response({'success': 'Item added to your cart'})
+        except Exception as e:
+            raise APIException(str(e))
 
 
     @swagger_auto_schema(
