@@ -636,34 +636,20 @@ class OrderView(APIView):
             'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y")
         }, status=201)
 
-
 class ApplicationView(ListAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    @swagger_auto_schema(
-        tags=['application'],
-        operation_description="Получение списка заявок пользователя (оформленных заказов)",
-        responses={
-            200: ApplicationSerializer(many=True),
-            401: openapi.Response(
-                description="Неавторизованный доступ",
-                examples={
-                    'application/json': {'error': 'Unauthorized'}
-                }
-            ),
-        }
-    )
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
-
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user, application=True)
 
     def get_serializer_context(self):
+        """Передаем total_quantity и total_price в сериализатор"""
         context = super().get_serializer_context()
         user = self.request.user
+
+        # Получаем последнюю оформленную корзину
         cart = Cart.objects.filter(user=user, ordered=True).order_by('-id').first()
 
         if cart:
