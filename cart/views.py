@@ -141,11 +141,17 @@ class CartView(APIView):
     def post(self, request):
         data = request.data
         user = request.user
-        # Получаем корзину пользователя (или создаем новую, если она не существует)
+
         cart, _ = Cart.objects.get_or_create(user=user, ordered=False)
 
-        # Получаем товар, который был добавлен
-        product = get_object_or_404(Product, id=data.get('product'))
+        product_id = data.get('product')
+        if not product_id:
+            return Response({"error": "Product ID is required"}, status=400)
+
+        print(f"Полученный product_id: {product_id}")
+
+        product = get_object_or_404(Product, id=product_id, is_active=True)
+
         quantity = int(data.get('quantity', 1))
 
         # Проверка на корректность количества
