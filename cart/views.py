@@ -4,6 +4,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
 from rest_framework.generics import ListAPIView
+from rest_framework.exceptions import PermissionDenied
 
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -611,10 +612,12 @@ class OrderView(APIView):
         if not by_card and not by_cash:
             return Response({'error': "At least one of 'by_card' or 'by_cash' must be True."}, status=400)
 
+        # Получаем корзину текущего пользователя
         cart = Cart.objects.filter(user=user, ordered=False).first()
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
 
+        # Создаем заказ
         order = Order.objects.create(
             user=user,
             address=address,
@@ -622,9 +625,32 @@ class OrderView(APIView):
             by_cash=by_cash,
         )
 
+        # Рассчитываем total_price и total_quantity
+        total_price = Decimal('0.00')
+        total_quantity = 0
+
+        # Логика для определения роли пользователя (например, через группы)
+        user_role = "wholesaler" if user.groups.filter(name="wholesaler").exists() else "retailer"
+
+        for item in cart.items.all():  # Предполагается, что у корзины есть связь с товарами
+            if user_role == 'wholesaler':
+                price = item.wholesale_price  # Цена для оптовика
+            else:
+                price = item.retail_price  # Цена для розничного покупателя
+
+            total_price += price * item.quantity
+            total_quantity += item.quantity
+
+        # Сохраняем рассчитанные значения в заказ
+        order.total_price = total_price
+        order.total_quantity = total_quantity
+        order.save()
+
+        # Обновляем корзину, чтобы она была отмечена как заказанная
         cart.ordered = True
         cart.save()
 
+        # Отправляем уведомление о заказе
         send_order_notification(order, cart)
 
         return Response({
@@ -633,29 +659,30 @@ class OrderView(APIView):
             'address': order.address,
             'by_card': order.by_card,
             'by_cash': order.by_cash,
-            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y")
+            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y"),
+            'total_price': str(order.total_price),  # Отправляем цену в строковом формате
+            'total_quantity': order.total_quantity,
         }, status=201)
+
 
 class ApplicationView(ListAPIView):
     serializer_class = ApplicationSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = []  # Отключаем аутентификацию
+    permission_classes = []  # Отключаем проверку прав
 
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user, application=True)
+        return Order.objects.filter(application=True)
 
     def get_serializer_context(self):
-        """Передаем total_quantity и total_price в сериализатор"""
         context = super().get_serializer_context()
-        user = self.request.user
 
-        # Получаем последнюю оформленную корзину
-        cart = Cart.objects.filter(user=user, ordered=True).order_by('-id').first()
+        # Логика для подсчета total_quantity и total_price
+        cart = Cart.objects.filter(ordered=True).order_by('-id').first()
 
         if cart:
             total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
             total_price = sum(
-                (Decimal(item.product.wholesale_price if user.role == 'wholesaler' else item.product.price) *
+                (Decimal(item.product.wholesale_price if cart.user.role == 'wholesaler' else item.product.price) *
                  item.quantity) for item in cart.items.all()
             )
         else:

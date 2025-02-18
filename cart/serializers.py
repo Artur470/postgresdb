@@ -168,10 +168,10 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class ApplicationSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source="user.username")  # Получаем имя пользователя
-    order_created_at = serializers.DateTimeField(source="created_at", format="%Y-%m-%d %H:%M")  # Красиво форматируем дату
-    total_quantity = serializers.SerializerMethodField()  # Добавляем вручную
-    total_price = serializers.SerializerMethodField()  # Добавляем вручную
+    user = serializers.CharField(source="user.username")
+    order_created_at = serializers.DateTimeField(source="created_at", format="%Y-%m-%d %H:%M")
+    total_quantity = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
     p_method = serializers.SerializerMethodField()
 
     class Meta:
