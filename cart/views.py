@@ -642,7 +642,9 @@ class OrderView(APIView):
 
 class ApplicationView(ListAPIView):
     serializer_class = ApplicationSerializer
+    # Убираем аутентификацию
     authentication_classes = []  # Убираем аутентификацию
+    # Убираем проверку прав
     permission_classes = []  # Убираем проверку прав
 
     def get_queryset(self):
@@ -653,45 +655,19 @@ class ApplicationView(ListAPIView):
         """Передаем total_quantity и total_price в сериализатор"""
         context = super().get_serializer_context()
 
-        # Получаем пользователя из запроса
-        user = self.request.user
-
-        # Проверка, если пользователь не авторизован
-        if user.is_anonymous:
-            raise PermissionDenied("You must be logged in to view applications.")
-
-        is_wholesale = user.role == 'wholesaler'
-
-        # Получаем последнюю оформленную корзину пользователя
-        cart = Cart.objects.filter(user=user, ordered=True).first()
+        # Получаем последнюю оформленную корзину
+        cart = Cart.objects.filter(ordered=True).order_by('-id').first()
 
         if cart:
             total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-            total_price = Decimal(0)
-
-            for item in cart.items.all():
-                product = item.product
-                product_price = Decimal(product.price)
-                product_promotion = product.promotion
-
-                if is_wholesale:
-                    product_price = Decimal(product.wholesale_price)
-                    product_promotion = product.wholesale_promotion
-
-                if product_promotion:
-                    discounted_price = Decimal(product_promotion)
-                else:
-                    discounted_price = product_price
-
-                # Суммируем цену с учетом скидок и количества
-                total_price += discounted_price * item.quantity
-
+            total_price = sum(
+                (Decimal(item.product.wholesale_price if cart.user.role == 'wholesaler' else item.product.price) *
+                 item.quantity) for item in cart.items.all()
+            )
         else:
             total_quantity = 0
             total_price = 0
 
-        # Передаем в контекст
         context["total_quantity"] = total_quantity
         context["total_price"] = int(total_price)
-
         return context
