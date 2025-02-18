@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
 from rest_framework.generics import ListAPIView
 from rest_framework.exceptions import PermissionDenied
-
+from django.utils.timezone import localtime
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -434,7 +434,7 @@ def send_order_notification(order, cart):
 
     message = f"""
     Заказ №{order.id}
-    Дата заказа: {order.created_at}
+   Дата заказа: {localtime(order.created_at).strftime("%Y-%m-%d %H:%M")}
 
     Email пользователя: {order.user.email}
     Имя пользователя: {order.user.username}
