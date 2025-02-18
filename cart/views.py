@@ -612,12 +612,10 @@ class OrderView(APIView):
         if not by_card and not by_cash:
             return Response({'error': "At least one of 'by_card' or 'by_cash' must be True."}, status=400)
 
-        # Получаем корзину текущего пользователя
         cart = Cart.objects.filter(user=user, ordered=False).first()
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
 
-        # Создаем заказ
         order = Order.objects.create(
             user=user,
             address=address,
@@ -625,32 +623,9 @@ class OrderView(APIView):
             by_cash=by_cash,
         )
 
-        # Рассчитываем total_price и total_quantity
-        total_price = Decimal('0.00')
-        total_quantity = 0
-
-        # Логика для определения роли пользователя (например, через группы)
-        user_role = "wholesaler" if user.groups.filter(name="wholesaler").exists() else "retailer"
-
-        for item in cart.items.all():  # Предполагается, что у корзины есть связь с товарами
-            if user_role == 'wholesaler':
-                price = item.wholesale_price  # Цена для оптовика
-            else:
-                price = item.retail_price  # Цена для розничного покупателя
-
-            total_price += price * item.quantity
-            total_quantity += item.quantity
-
-        # Сохраняем рассчитанные значения в заказ
-        order.total_price = total_price
-        order.total_quantity = total_quantity
-        order.save()
-
-        # Обновляем корзину, чтобы она была отмечена как заказанная
         cart.ordered = True
         cart.save()
 
-        # Отправляем уведомление о заказе
         send_order_notification(order, cart)
 
         return Response({
@@ -659,36 +634,64 @@ class OrderView(APIView):
             'address': order.address,
             'by_card': order.by_card,
             'by_cash': order.by_cash,
-            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y"),
-            'total_price': str(order.total_price),  # Отправляем цену в строковом формате
-            'total_quantity': order.total_quantity,
+            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y")
         }, status=201)
+
+
 
 
 class ApplicationView(ListAPIView):
     serializer_class = ApplicationSerializer
-    authentication_classes = []  # Отключаем аутентификацию
-    permission_classes = []  # Отключаем проверку прав
+    authentication_classes = []  # Убираем аутентификацию
+    permission_classes = []  # Убираем проверку прав
 
     def get_queryset(self):
+        # Отфильтровываем только заявки, без привязки к пользователю
         return Order.objects.filter(application=True)
 
     def get_serializer_context(self):
+        """Передаем total_quantity и total_price в сериализатор"""
         context = super().get_serializer_context()
 
-        # Логика для подсчета total_quantity и total_price
-        cart = Cart.objects.filter(ordered=True).order_by('-id').first()
+        # Получаем пользователя из запроса
+        user = self.request.user
+
+        # Проверка, если пользователь не авторизован
+        if user.is_anonymous:
+            raise PermissionDenied("You must be logged in to view applications.")
+
+        is_wholesale = user.role == 'wholesaler'
+
+        # Получаем последнюю оформленную корзину пользователя
+        cart = Cart.objects.filter(user=user, ordered=True).first()
 
         if cart:
             total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-            total_price = sum(
-                (Decimal(item.product.wholesale_price if cart.user.role == 'wholesaler' else item.product.price) *
-                 item.quantity) for item in cart.items.all()
-            )
+            total_price = Decimal(0)
+
+            for item in cart.items.all():
+                product = item.product
+                product_price = Decimal(product.price)
+                product_promotion = product.promotion
+
+                if is_wholesale:
+                    product_price = Decimal(product.wholesale_price)
+                    product_promotion = product.wholesale_promotion
+
+                if product_promotion:
+                    discounted_price = Decimal(product_promotion)
+                else:
+                    discounted_price = product_price
+
+                # Суммируем цену с учетом скидок и количества
+                total_price += discounted_price * item.quantity
+
         else:
             total_quantity = 0
             total_price = 0
 
+        # Передаем в контекст
         context["total_quantity"] = total_quantity
         context["total_price"] = int(total_price)
+
         return context
