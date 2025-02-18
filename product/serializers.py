@@ -572,6 +572,9 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         product.main_characteristics = [{"label": label, "value": value} for label, value in characteristics_dict.items()]
         product.save()
+
+
+
 class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review

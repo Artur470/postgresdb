@@ -139,6 +139,34 @@ class CartView(APIView):
             'totalPrice': int(total_price),
         })
 
+    @swagger_auto_schema(
+        tags=['cart'],
+        operation_description="Этот эндпоинт позволяет пользователю добавить товар в свою корзину. "
+                              "Для этого нужно указать ID товара и его количество",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'product:  id ': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID товара",
+                                               required=['product']),
+                'quantity': openapi.Schema(type=openapi.TYPE_INTEGER, description="Количество товара",
+                                           required=['quantity']),
+            },
+        ),
+        responses={
+            201: openapi.Response(
+                description="Товар добавлен в корзину",
+                schema=openapi.Schema(type=openapi.TYPE_OBJECT, properties={
+                    'success': openapi.Schema(type=openapi.TYPE_STRING, description="Сообщение о результате операции"),
+                }),
+            ),
+            400: openapi.Response(
+                description="Ошибка при добавлении товара в корзину",
+                schema=openapi.Schema(type=openapi.TYPE_OBJECT, properties={
+                    'error': openapi.Schema(type=openapi.TYPE_STRING, description="Сообщение об ошибке"),
+                }),
+            ),
+        }
+    )
     def post(self, request):
         data = request.data
         user = request.user
