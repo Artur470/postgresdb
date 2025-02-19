@@ -569,6 +569,10 @@ class ProductCreateView(generics.CreateAPIView):
             return model.objects.get(value=value)
         except model.DoesNotExist:
             return None
+
+
+
+
 class ReviewCreateView(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewCreateSerializer
@@ -606,51 +610,11 @@ class ReviewCreateView(generics.CreateAPIView):
         }
     )
     def post(self, request, *args, **kwargs):
-        # Подготовка контекста для сериализатора
-        serializer_context = {'request': request}
-
-        # Создаем копию данных запроса
-        request_data = request.data.copy()
-
-        # Сопоставляем модели с ключами
-        model_map = {
-            'brand': Brand,
-            'category': Category,
-            'color': Color,
-        }
-
-        # Замена значений на ID объектов
-        for key, model in model_map.items():
-            value = request_data.get(key)
-            if value:
-                obj = self.get_object_by_value(model, value)
-                if not obj:
-                    return Response(
-                        {key: [f"Объект с указанным значением '{value}' не существует."]},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                request_data[key] = obj.id  # Заменяем строковое значение на числовой ID
-
-        # Создание и валидация продукта через сериализатор
-        serializer = ProductCreateSerializer(data=request_data, context=serializer_context)
+        serializer = ReviewCreateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # Пример кода для получения объекта по значению в сериализаторе:
-    def get_object_by_value(model, value, field_name):
-        if value:
-            try:
-                return model.objects.get(
-                    value__iexact=value)  # Убедитесь, что используется 'iexact' для нечувствительности к регистру
-            except model.DoesNotExist:
-                raise serializers.ValidationError({
-                    field_name: f"{model.__name__} with the specified value '{value}' does not exist."
-                })
-        return None
-
 
 class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
