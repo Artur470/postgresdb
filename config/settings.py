@@ -111,7 +111,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 DATABASES = {
-    'default': dj_database_url.parse("postgresql://data_homelife_user:1OfRzDig5aian3Oo6Gb5KwkEqYO3upDl@dpg-cspmaulumphs73d500kg-a.oregon-postgres.render.com/data_homelife")
+    'default': dj_database_url.parse("postgresql://homelifedb_8uc5_user:37M760pmHnw9Z0uoviabZKCz5otVncQb@dpg-cuqp6t5ds78s7380lgog-a.oregon-postgres.render.com/homelifedb_8uc5")
 }
 
 
