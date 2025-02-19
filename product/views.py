@@ -513,20 +513,50 @@ class ProductCreateView(generics.CreateAPIView):
             )
         },
         parameters=[
-            openapi.Parameter('brand', openapi.IN_BODY, description="Бренд продукта, необходимо указать существующий бренд.",
-                              required=True, type=openapi.TYPE_STRING),
-            openapi.Parameter('category', openapi.IN_BODY, description="Категория продукта, необходимо указать существующую категорию.",
-                              required=True, type=openapi.TYPE_STRING),
-            openapi.Parameter('color', openapi.IN_BODY, description="Цвет продукта, необходимо указать существующий цвет.",
-                              required=True, type=openapi.TYPE_STRING),
             openapi.Parameter(
-                'main_characteristics', openapi.IN_BODY,
+                'brand',
+                openapi.IN_BODY,
+                description="Бренд продукта, необходимо указать существующий бренд.",
+                required=True,
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'category',
+                openapi.IN_BODY,
+                description="Категория продукта, необходимо указать существующую категорию.",
+                required=True,
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'color',
+                openapi.IN_BODY,
+                description="Цвет продукта, необходимо указать существующий цвет.",
+                required=True,
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'main_characteristics',
+                openapi.IN_BODY,
                 description="Основные характеристики продукта. Должны быть переданы как массив объектов с полями 'label' и 'value'.",
-                required=False, type=openapi.TYPE_ARRAY,
-                items=openapi.Items(type=openapi.TYPE_OBJECT, properties={
-                    'label': openapi.Schema(type=openapi.TYPE_STRING, description="Название характеристики, например, 'main'"),
-                    'value': openapi.Schema(type=openapi.TYPE_STRING, description="Значение характеристики, например, 'grngd'")
-                })
+                required=False,
+                type=openapi.TYPE_ARRAY,
+                items=openapi.Items(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'label': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Название характеристики, например, 'main'"
+                        ),
+                        'value': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Значение характеристики, например, 'grngd'"
+                        )
+                    }
+                ),
+                example=[
+                    {"label": "ngnraenfds", "value": "eaorfmeomf"},
+                    {"label": "fekngkv", "value": "rgergvre"}
+                ]
             )
         ]
     )
