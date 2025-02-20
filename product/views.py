@@ -633,8 +633,11 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
             404: "Комментарий не найден"
         }
     )
+
     def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response([serializer.data])  # Оборачиваем в список
 
     def get_queryset(self):
         # Фильтруем, чтобы пользователь видел только свои отзывы
