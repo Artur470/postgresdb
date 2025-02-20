@@ -17,6 +17,8 @@ from django.db.models import Sum, F
 from rest_framework.decorators import api_view
 from product.models import Product
 from .models import Cart, CartItem, Order
+from .serializers import CartItemsSerializer
+
 from .serializers import (OrderSummarySerializer)
 from rest_framework import status
 from rest_framework.response import Response
@@ -280,16 +282,29 @@ class CartView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Поиск элемента корзины
-        try:
-            cart_item = get_object_or_404(CartItem, cart__user=request.user, product__id=product_id)
-        except Http404:
+        cart_item = CartItem.objects.filter(cart__user=request.user, product__id=product_id).first()
+
+        if not cart_item:
             return Response({'error': 'Product not found in cart.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Проверка наличия достаточного количества на складе
-        if new_quantity > cart_item.product.quantity:
-            return Response({'error': 'Not enough stock available.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Получаем текущее количество товара в корзине
+        old_quantity = cart_item.quantity
 
-        # Определяем цену и скидку в зависимости от роли пользователя
+        # Если количество в корзине изменилось, обновляем количество на складе
+        if new_quantity < old_quantity:
+            # Возвращаем разницу на склад
+            cart_item.product.quantity += (old_quantity - new_quantity)
+        elif new_quantity > old_quantity:
+            # Проверяем наличие товара на складе
+            if new_quantity > cart_item.product.quantity:
+                return Response({'error': 'Not enough stock available.'}, status=status.HTTP_400_BAD_REQUEST)
+            # Уменьшаем количество товара на складе
+            cart_item.product.quantity -= (new_quantity - old_quantity)
+
+        # Сохраняем изменения на складе
+        cart_item.product.save()
+
+        # Обновляем количество и цену товара в корзине
         product = cart_item.product
         if request.user.role == 'wholesaler':  # Если пользователь — оптовик
             base_price = product.wholesale_price
@@ -342,7 +357,7 @@ class CartView(APIView):
             # Добавляем к общей стоимости
             total_quantity += item.quantity
             subtotal += item_base_price * item.quantity  # Сумма без скидок (базовая цена * количество)
-            total_price += item_promotion * item.quantity  # Сумма с учетом скидки (цена с скидкой * количество)
+            total_price += promotion * item.quantity  # Сумма с учетом скидки (цена с скидкой * количество)
 
         # Обновляем данные корзины
         cart.total_quantity = total_quantity
@@ -404,6 +419,7 @@ class CartView(APIView):
             ),
         }
     )
+    # views.py
     def delete(self, request):
         data = request.data
         user = request.user
@@ -418,7 +434,14 @@ class CartView(APIView):
         try:
             # Находим товар в корзине по product_id
             cart_item = CartItem.objects.get(cart=cart, product__id=product_id)
+
+            # Возвращаем количество товара обратно на склад
+            cart_item.product.quantity += cart_item.quantity
+            cart_item.product.save()
+
+            # Удаляем товар из корзины
             cart_item.delete()
+
         except CartItem.DoesNotExist:
             return Response({'error': 'Product not found'}, status=404)
 
@@ -427,12 +450,11 @@ class CartView(APIView):
         cart.save()
 
         return Response({
-            'items': CartItemsSerializer(cart.items.all(), many=True).data,
-            'total_quantity': cart.total_quantity,
-            'subtotal': cart.subtotal,
-            'totalPrice': cart.total_price,
+            'message': 'Delete successful',  # Сообщение о успешном удалении
+            'total_quantity': sum(item.quantity for item in CartItem.objects.filter(cart=cart)),
+            # Общее количество товаров в корзине
+            'subtotal': cart.total_price,  # Общая стоимость
         }, status=204)
-
 
 
 def send_order_notification(order, cart):
