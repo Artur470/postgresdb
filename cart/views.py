@@ -681,8 +681,6 @@ class OrderView(APIView):
         }, status=201)
 
 
-
-
 class ApplicationView(ListAPIView):
     serializer_class = ApplicationSerializer
     # Убираем аутентификацию

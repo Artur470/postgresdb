@@ -60,11 +60,18 @@ class CartItem(models.Model):
 
 class Order(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    role = models.CharField(max_length=50, blank=True, null=True)
     address = models.CharField(max_length=255)
     by_card = models.BooleanField(default=False)
     by_cash = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     application = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        # Сохраняем роль пользователя при создании заказа
+        if not self.role:
+            self.role = self.user.role if self.user else 'customer'  # Если роль не указана, устанавливаем роль по умолчанию
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Заказ {self.id} – {self.address}"
