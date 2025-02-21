@@ -615,6 +615,9 @@ class ReviewCreateView(generics.CreateAPIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import Http404
 
 class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
@@ -633,21 +636,22 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
             404: "Комментарий не найден"
         }
     )
-
     def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        if not queryset.exists():  # Если отзывов нет, возвращаем пустой массив
+            return Response([], status=status.HTTP_200_OK)
+
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response([serializer.data])  # Оборачиваем в список
 
     def get_queryset(self):
-        # Фильтруем, чтобы пользователь видел только свои отзывы
         return Review.objects.filter(user=self.request.user)
 
     def handle_exception(self, exc):
         if isinstance(exc, Http404):
-            return Response({"detail": "Комментарий не найден."}, status=status.HTTP_404_NOT_FOUND)
+            return Response([], status=status.HTTP_200_OK)  # Тоже возвращаем пустой массив
         return super().handle_exception(exc)
-
 
 class BannerView(APIView):
     @swagger_auto_schema(
