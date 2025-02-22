@@ -565,9 +565,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
     class Meta:
         model = Review
-        fields = ['id','product','rating','comments','created','updated']
+        fields = ['id','product','rating','comments','created','updated',  'username',]
 
 
 
