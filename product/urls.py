@@ -21,7 +21,8 @@ urlpatterns = [
     path('promotions/', ProductPromotionView.as_view(), name='product-promotions'),
     # path('day/', ProductDayView.as_view(), name='product-of-the-day'),
     path('comment/', ReviewCreateView.as_view(), name='create-review'),  # Маршрут для создания отзыва
-    path('comment/<int:pk>/', ReviewDetailView.as_view(), name='review-detail'),
+    path('<int:product_id>/comments/', ReviewDetailView.as_view(), name='product-comments'),
+
     # Маршрут для детального просмотра отзыва
     path('banner/', BannerView.as_view(), name='banner-detail'),
 

@@ -615,43 +615,39 @@ class ReviewCreateView(generics.CreateAPIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-from rest_framework.response import Response
-from rest_framework import status
-from django.http import Http404
 
-class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+class ReviewDetailView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = Review.objects.all()
     serializer_class = ReviewCreateSerializer
     authentication_classes = [JWTAuthentication]
 
     @swagger_auto_schema(
         tags=['review'],
-        operation_description="Получить, обновить или удалить комментарий по его ID.",
+        operation_description="Получить комментарии к товару по его ID.",
         responses={
             200: openapi.Response('Успешное получение данных', ReviewCreateSerializer),
             400: "Ошибка валидации данных",
             401: "Аутентификация не выполнена",
             403: "Доступ запрещен",
-            404: "Комментарий не найден"
+            404: "Комментарии не найдены"
         }
     )
     def get(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        if not queryset.exists():  # Если отзывов нет, возвращаем пустой массив
+        product_id = kwargs.get('product_id')  # Получаем id товара из URL
+
+        # Фильтруем комментарии по product_id
+        reviews = Review.objects.filter(product_id=product_id)
+
+        if not reviews.exists():  # Если отзывов нет, возвращаем пустой массив
             return Response([], status=status.HTTP_200_OK)
 
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response([serializer.data])  # Оборачиваем в список
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)  # Возвращаем комментарии товара
 
     def get_queryset(self):
-        return Review.objects.filter(user=self.request.user)
+        return Review.objects.all()
 
-    def handle_exception(self, exc):
-        if isinstance(exc, Http404):
-            return Response([], status=status.HTTP_200_OK)  # Тоже возвращаем пустой массив
-        return super().handle_exception(exc)
 
 class BannerView(APIView):
     @swagger_auto_schema(

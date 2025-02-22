@@ -9,7 +9,6 @@ from django.contrib.auth.models import (
 )
 from datetime import timedelta
 
-
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -23,7 +22,7 @@ class CustomUserManager(BaseUserManager):
         else:
             role = 'customer'
 
-        user = self.model(email=email, role=role, **extra_fields)
+        user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -31,7 +30,7 @@ class CustomUserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', 'admin')  # Роль для суперпользователя - 'admin'
+        # extra_fields.setdefault('admin')  # Роль для суперпользователя - 'admin'
 
         return self.create_user(email, password, **extra_fields)
 
@@ -42,6 +41,7 @@ class Gender(models.Model):
 
     def __str__(self):
         return self.label
+
 
 
 
@@ -72,7 +72,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
-
 
 
 
