@@ -521,76 +521,76 @@ class OrderView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    @swagger_auto_schema(
-        tags=['order'],
-        operation_description="Получение данных корзины пользователя",
-        responses={
-            200: openapi.Response(
-                description="Данные корзины",
-                examples={
-                    'application/json': {
-                        "total_quantity": 24,
-                        "subtotal": 72000,
-                        "totalPrice": 71976
-                    }
-                },
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'total_quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
-                                                         description='Общее количество товаров в корзине'),
-                        'subtotal': openapi.Schema(type=openapi.TYPE_INTEGER,
-                                                   description='Общая сумма без учета скидки'),
-                        'totalPrice': openapi.Schema(type=openapi.TYPE_INTEGER,
-                                                     description='Общая сумма с учетом скидки'),
-                    },
-                    required=['total_quantity', 'subtotal', 'totalPrice']
-                )
-            ),
-            404: openapi.Response(description="Корзина не найдена"),
-            401: openapi.Response(description="Ошибка авторизации"),
-            500: openapi.Response(description="Ошибка сервера")
-        }
-    )
-    def get(self, request):
-        user = request.user
-
-        is_wholesale = user.role == 'wholesaler'
-
-        cart = Cart.objects.filter(user=user, ordered=False).first()
-
-        if not cart:
-            return Response({'error': 'Cart not found'}, status=404)
-
-
-        total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-        subtotal = Decimal(0)
-        total_price = Decimal(0)
-
-
-        for item in cart.items.all():
-            product = item.product
-            product_price = Decimal(product.price)
-            product_promotion = product.promotion
-
-            if is_wholesale:
-                product_price = Decimal(product.wholesale_price)
-                product_promotion = product.wholesale_promotion
-
-            if product_promotion:
-                discounted_price = Decimal(product_promotion)
-            else:
-                discounted_price = product_price
-
-
-            subtotal += product_price * item.quantity
-            total_price += discounted_price * item.quantity
-
-        return Response({
-            "total_quantity": total_quantity,
-            "subtotal": int(subtotal),
-            "totalPrice": int(total_price),
-        })
+    # @swagger_auto_schema(
+    #     tags=['order'],
+    #     operation_description="Получение данных корзины пользователя",
+    #     responses={
+    #         200: openapi.Response(
+    #             description="Данные корзины",
+    #             examples={
+    #                 'application/json': {
+    #                     "total_quantity": 24,
+    #                     "subtotal": 72000,
+    #                     "totalPrice": 71976
+    #                 }
+    #             },
+    #             schema=openapi.Schema(
+    #                 type=openapi.TYPE_OBJECT,
+    #                 properties={
+    #                     'total_quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
+    #                                                      description='Общее количество товаров в корзине'),
+    #                     'subtotal': openapi.Schema(type=openapi.TYPE_INTEGER,
+    #                                                description='Общая сумма без учета скидки'),
+    #                     'totalPrice': openapi.Schema(type=openapi.TYPE_INTEGER,
+    #                                                  description='Общая сумма с учетом скидки'),
+    #                 },
+    #                 required=['total_quantity', 'subtotal', 'totalPrice']
+    #             )
+    #         ),
+    #         404: openapi.Response(description="Корзина не найдена"),
+    #         401: openapi.Response(description="Ошибка авторизации"),
+    #         500: openapi.Response(description="Ошибка сервера")
+    #     }
+    # )
+    # def get(self, request):
+    #     user = request.user
+    #
+    #     is_wholesale = user.role == 'wholesaler'
+    #
+    #     cart = Cart.objects.filter(user=user, ordered=False).first()
+    #
+    #     if not cart:
+    #         return Response({'error': 'Cart not found'}, status=404)
+    #
+    #
+    #     total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+    #     subtotal = Decimal(0)
+    #     total_price = Decimal(0)
+    #
+    #
+    #     for item in cart.items.all():
+    #         product = item.product
+    #         product_price = Decimal(product.price)
+    #         product_promotion = product.promotion
+    #
+    #         if is_wholesale:
+    #             product_price = Decimal(product.wholesale_price)
+    #             product_promotion = product.wholesale_promotion
+    #
+    #         if product_promotion:
+    #             discounted_price = Decimal(product_promotion)
+    #         else:
+    #             discounted_price = product_price
+    #
+    #
+    #         subtotal += product_price * item.quantity
+    #         total_price += discounted_price * item.quantity
+    #
+    #     return Response({
+    #         "total_quantity": total_quantity,
+    #         "subtotal": int(subtotal),
+    #         "totalPrice": int(total_price),
+    #     })
 
     @swagger_auto_schema(
         tags=['order'],
