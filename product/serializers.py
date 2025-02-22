@@ -289,9 +289,7 @@ class ReviewSummarySerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
-    avg_rating = serializers.SerializerMethodField()
     main_characteristics = serializers.JSONField()
-    reviews = ReviewSummarySerializer(many=True, read_only=True)
     price = serializers.SerializerMethodField()
     promotion = serializers.SerializerMethodField()
 
@@ -314,17 +312,9 @@ class ProductSerializer(serializers.ModelSerializer):
             'quantity',
             'description',
             'is_product_of_the_day',
-            'avg_rating',
-            'reviews',
             'is_active',
             'main_characteristics',
         ]
-
-    def get_avg_rating(self, obj):
-        if obj.reviews.exists():
-            avg_rating = obj.reviews.aggregate(Avg('rating'))['rating__avg']
-            return round(avg_rating, 1) if avg_rating else 0
-        return 0
 
     def get_images(self, obj):
         request = self.context.get('request')
@@ -398,8 +388,7 @@ class ProductSerializer(serializers.ModelSerializer):
             user = request.user
             if user.role == 'wholesaler':
                 representation['price'] = instance.wholesale_price if instance.wholesale_price else instance.price
-                representation[
-                    'promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
+                representation[ 'promotion'] = instance.wholesale_promotion if instance.wholesale_promotion else instance.promotion
 
         # Добавляем логику для поля color
         color_instance = getattr(instance, 'color', None)

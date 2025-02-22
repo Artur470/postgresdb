@@ -690,7 +690,7 @@ class ApplicationView(ListAPIView):
 
     def get_queryset(self):
         # Отфильтровываем только заявки, без привязки к пользователю
-        return Order.objects.filter(application=True)
+        return Order.objects.filter(ordered=True)
 
     def get_serializer_context(self):
         """Передаем total_quantity и total_price в сериализатор"""
@@ -710,5 +710,5 @@ class ApplicationView(ListAPIView):
             total_price = 0
 
         context["total_quantity"] = total_quantity
-        context["total_price"] = int(total_price)
+        context["total_price"] = float(total_price)
         return context
