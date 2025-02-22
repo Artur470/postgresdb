@@ -624,13 +624,13 @@ class ReviewDetailView(generics.ListAPIView):
 
     @swagger_auto_schema(
         tags=['review'],
-        operation_description="Получить комментарии к товару по его ID.",
+        operation_description="Получить все комментарии для товара по его ID.",
         responses={
-            200: openapi.Response('Успешное получение данных', ReviewCreateSerializer),
+            200: openapi.Response('Успешное получение данных', ReviewCreateSerializer(many=True)),
             400: "Ошибка валидации данных",
             401: "Аутентификация не выполнена",
             403: "Доступ запрещен",
-            404: "Комментарии не найдены"
+            404: "Комментарии для данного товара не найдены"
         }
     )
     def get(self, request, *args, **kwargs):
