@@ -163,33 +163,43 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'address', 'by_card', 'by_cash', 'created_at']
+        fields = ['id',  'address', 'by_card', 'by_cash', 'created_at',]
         read_only_fields = ['id', 'created_at']
 
 
 
 
+
 class ApplicationSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source="user.username")
-    order_created_at = serializers.DateTimeField(source="created_at", format="%Y-%m-%d %H:%M")
-    total_quantity = serializers.SerializerMethodField()
-    total_price = serializers.SerializerMethodField()
-    p_method = serializers.SerializerMethodField()
+    username = serializers.CharField(source='user.username', read_only=True)
+    role = serializers.CharField(source='user.role', read_only=True)
+    payment_method = serializers.SerializerMethodField()  # Для метода оплаты
+    totalPrice = serializers.SerializerMethodField()
+    products = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
-        fields = ["id", "user", "order_created_at", "total_quantity", "total_price", "p_method"]  # Только нужные поля
+        fields = ['id', 'username', 'role', 'payment_method', 'created_at', 'totalPrice', 'products']
 
-    def get_total_quantity(self, obj):
-        return self.context.get("total_quantity", 0)  # Берем total_quantity из контекста
-
-    def get_total_price(self, obj):
-        return self.context.get("total_price", 0)  # Берем total_price из контекста
-
-    def get_p_method(self, obj):
-        """Возвращает только одно из полей: by_card или by_cash"""
+    def get_payment_method(self, obj):
         if obj.by_card:
-            return "by_card"
+            return "By Card"
         elif obj.by_cash:
-            return "by_cash"
-        return None  # Если оба False
+            return "By Cash"
+        return "Unknown"  # Если метод не выбран
+
+    def get_totalPrice(self, obj):
+        # Получаем корзину заказа и возвращаем total_price
+        return obj.cart.total_price if obj.cart else 0  # total_price из корзины
+
+    def get_products(self, obj):
+        products = []
+        for item in obj.cart.items.all():  # Используем 'items', а не 'cartitem_set'
+            product = item.product
+            product_data = {
+                'product_title': product.title,
+                'quantity': item.quantity,
+                'productTotalPrice': item.total_price()  # Используем метод total_price для расчета
+            }
+            products.append(product_data)
+        return products

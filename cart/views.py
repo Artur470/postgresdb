@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializers import ApplicationSerializer
+from .serializers import OrderSerializer, ApplicationSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db.models import Sum, F
 from rest_framework.decorators import api_view
@@ -521,77 +521,6 @@ class OrderView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    # @swagger_auto_schema(
-    #     tags=['order'],
-    #     operation_description="Получение данных корзины пользователя",
-    #     responses={
-    #         200: openapi.Response(
-    #             description="Данные корзины",
-    #             examples={
-    #                 'application/json': {
-    #                     "total_quantity": 24,
-    #                     "subtotal": 72000,
-    #                     "totalPrice": 71976
-    #                 }
-    #             },
-    #             schema=openapi.Schema(
-    #                 type=openapi.TYPE_OBJECT,
-    #                 properties={
-    #                     'total_quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
-    #                                                      description='Общее количество товаров в корзине'),
-    #                     'subtotal': openapi.Schema(type=openapi.TYPE_INTEGER,
-    #                                                description='Общая сумма без учета скидки'),
-    #                     'totalPrice': openapi.Schema(type=openapi.TYPE_INTEGER,
-    #                                                  description='Общая сумма с учетом скидки'),
-    #                 },
-    #                 required=['total_quantity', 'subtotal', 'totalPrice']
-    #             )
-    #         ),
-    #         404: openapi.Response(description="Корзина не найдена"),
-    #         401: openapi.Response(description="Ошибка авторизации"),
-    #         500: openapi.Response(description="Ошибка сервера")
-    #     }
-    # )
-    # def get(self, request):
-    #     user = request.user
-    #
-    #     is_wholesale = user.role == 'wholesaler'
-    #
-    #     cart = Cart.objects.filter(user=user, ordered=False).first()
-    #
-    #     if not cart:
-    #         return Response({'error': 'Cart not found'}, status=404)
-    #
-    #
-    #     total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-    #     subtotal = Decimal(0)
-    #     total_price = Decimal(0)
-    #
-    #
-    #     for item in cart.items.all():
-    #         product = item.product
-    #         product_price = Decimal(product.price)
-    #         product_promotion = product.promotion
-    #
-    #         if is_wholesale:
-    #             product_price = Decimal(product.wholesale_price)
-    #             product_promotion = product.wholesale_promotion
-    #
-    #         if product_promotion:
-    #             discounted_price = Decimal(product_promotion)
-    #         else:
-    #             discounted_price = product_price
-    #
-    #
-    #         subtotal += product_price * item.quantity
-    #         total_price += discounted_price * item.quantity
-    #
-    #     return Response({
-    #         "total_quantity": total_quantity,
-    #         "subtotal": int(subtotal),
-    #         "totalPrice": int(total_price),
-    #     })
-
     @swagger_auto_schema(
         tags=['order'],
         operation_description="Создание заказа для пользователя",
@@ -655,20 +584,40 @@ class OrderView(APIView):
         if not by_card and not by_cash:
             return Response({'error': "At least one of 'by_card' or 'by_cash' must be True."}, status=400)
 
+        # Получаем корзину пользователя, которая ещё не была оформлена
         cart = Cart.objects.filter(user=user, ordered=False).first()
         if not cart:
             return Response({'error': 'Cart not found'}, status=404)
 
+        # Обновляем итоговую стоимость корзины перед созданием заказа
+        cart.update_totals()  # Важно обновить итоги, чтобы получить актуальную цену
+
+        # Создаём заказ с привязкой к корзине
         order = Order.objects.create(
             user=user,
             address=address,
             by_card=by_card,
             by_cash=by_cash,
+            cart=cart,  # Привязываем корзину к заказу
+            ordered=True  # Теперь заказ оформлен
         )
 
+        # Обновляем статус корзины
         cart.ordered = True
         cart.save()
 
+        # Формируем список продуктов для заказа
+        products = []
+        for item in cart.items.all():  # Используем related_name='items'
+            product = item.product
+            product_data = {
+                'title': product.title,  # Правильный ключ без кавычек
+                'quantity': item.quantity,
+                'productTotalPrice': product.price * item.quantity
+            }
+            products.append(product_data)
+
+        # Отправка уведомления о заказе (по необходимости)
         send_order_notification(order, cart)
 
         return Response({
@@ -677,38 +626,20 @@ class OrderView(APIView):
             'address': order.address,
             'by_card': order.by_card,
             'by_cash': order.by_cash,
-            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y")
+            'totalPrice': cart.total_price,  # Передаем актуальную стоимость корзины
+            'created_at': order.created_at.strftime("%H:%M:%S %d-%m-%Y"),
+            'products': products  # Добавляем список товаров
         }, status=201)
 
-
-class ApplicationView(ListAPIView):
+class ApplicationListView(APIView):
     serializer_class = ApplicationSerializer
-    # Убираем аутентификацию
-    authentication_classes = []  # Убираем аутентификацию
-    # Убираем проверку прав
-    permission_classes = []  # Убираем проверку прав
+
+    def get(self, request):
+        # Получаем заказанные заявки (где ordered=True и application=True)
+        applications = self.get_queryset()
+        serializer = self.serializer_class(applications, many=True)
+        return Response(serializer.data)
 
     def get_queryset(self):
-        # Отфильтровываем только заявки, без привязки к пользователю
-        return Order.objects.filter(ordered=True)
-
-    def get_serializer_context(self):
-        """Передаем total_quantity и total_price в сериализатор"""
-        context = super().get_serializer_context()
-
-        # Получаем последнюю оформленную корзину
-        cart = Cart.objects.filter(ordered=True).order_by('-id').first()
-
-        if cart:
-            total_quantity = cart.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-            total_price = sum(
-                (Decimal(item.product.wholesale_price if cart.user.role == 'wholesaler' else item.product.price) *
-                 item.quantity) for item in cart.items.all()
-            )
-        else:
-            total_quantity = 0
-            total_price = 0
-
-        context["total_quantity"] = total_quantity
-        context["total_price"] = float(total_price)
-        return context
+        """Фильтруем заказы по полям ordered и application"""
+        return Order.objects.filter(ordered=True, application=True)

@@ -65,12 +65,18 @@ class Order(models.Model):
     by_card = models.BooleanField(default=False)
     by_cash = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    application = models.BooleanField(default=False)
-
+    application = models.BooleanField(default=False)  # Флаг успешного заказа
+    ordered = models.BooleanField(default=False)
+    cart = models.OneToOneField(Cart, on_delete=models.CASCADE, null=True, blank=True)
     def save(self, *args, **kwargs):
-        # Сохраняем роль пользователя при создании заказа
+        # Устанавливаем роль, если не указана
         if not self.role:
-            self.role = self.user.role if self.user else 'customer'  # Если роль не указана, устанавливаем роль по умолчанию
+            self.role = self.user.role if self.user else 'customer'
+
+        # Если заказ оформлен (оплачено наличными или картой), ставим application=True
+        if self.by_card or self.by_cash:
+            self.application = True
+
         super().save(*args, **kwargs)
 
     def __str__(self):
