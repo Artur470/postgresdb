@@ -634,6 +634,47 @@ class OrderView(APIView):
 class ApplicationListView(APIView):
     serializer_class = ApplicationSerializer
 
+    @swagger_auto_schema(
+        operation_description="Получить все заявленные заказы, где заказ оформлен и успешно завершен. Также возвращает список товаров в корзине каждого заказа с их количеством и общей стоимостью.",
+        responses={
+            200: openapi.Response(
+                description="Список заявок с деталями товаров",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'id': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID заказа'),
+                            'username': openapi.Schema(type=openapi.TYPE_STRING, description='Имя пользователя'),
+                            'role': openapi.Schema(type=openapi.TYPE_STRING, description='Роль пользователя'),
+                            'payment_method': openapi.Schema(type=openapi.TYPE_STRING, description='Метод оплаты'),
+                            'created_at': openapi.Schema(type=openapi.TYPE_STRING, description='Дата создания заказа'),
+                            'totalPrice': openapi.Schema(type=openapi.TYPE_NUMBER, format=openapi.FORMAT_FLOAT,
+                                                         description='Общая стоимость заказа'),
+                            'products': openapi.Schema(
+                                type=openapi.TYPE_ARRAY,
+                                items=openapi.Schema(
+                                    type=openapi.TYPE_OBJECT,
+                                    properties={
+                                        'product_title': openapi.Schema(type=openapi.TYPE_STRING,
+                                                                        description='Название товара'),
+                                        'quantity': openapi.Schema(type=openapi.TYPE_INTEGER,
+                                                                   description='Количество товара'),
+                                        'productTotalPrice': openapi.Schema(type=openapi.TYPE_NUMBER,
+                                                                            format=openapi.FORMAT_FLOAT,
+                                                                            description='Общая стоимость товара (с учетом количества и скидок)')
+                                    }
+                                )
+                            )
+                        }
+                    )
+                )
+            ),
+            400: "Неверные параметры запроса",
+            404: "Заявки не найдены"
+        }
+    )
+
     def get(self, request):
         # Получаем заказанные заявки (где ordered=True и application=True)
         applications = self.get_queryset()
