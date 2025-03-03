@@ -683,4 +683,4 @@ class ApplicationListView(APIView):
 
     def get_queryset(self):
         """Фильтруем заказы по полям ordered и application"""
-        return Order.objects.filter(ordered=True, application=True)
+        return Order.objects.filter(ordered=True, application=True).order_by('-id')
