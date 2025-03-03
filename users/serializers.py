@@ -137,8 +137,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
 
-        min_length=5,
-        max_length=20,
+        min_length=1,
+        max_length=100,
     )
     password = serializers.CharField(write_only=True)
     wholesaler = serializers.BooleanField(required=False, default=False)
