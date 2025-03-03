@@ -136,11 +136,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 # Register
 class UserRegistrationSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
-        validators=[RegexValidator(
-            regex=r'^[a-zA-Z0-9!@#$%^&*()_+.-]+$',
-            message='Username can only contain English letters, numbers, and special characters (!@#$%^&*()_+.-)',
-        )],
-        min_length=6,
+
+        min_length=5,
         max_length=20,
     )
     password = serializers.CharField(write_only=True)

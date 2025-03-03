@@ -13,7 +13,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category  # Обратите внимание, что вы используете модель Category, а не Brand
-        fields = ['label', 'value']
+        fields = ['id','label', 'value']
 
     def get_value(self, obj):
         translation = {
@@ -121,7 +121,7 @@ class ColorSerializer(serializers.ModelSerializer):
             'розовый': 'pink',
             'серый': 'gray',
             'коричневый': 'brown',
-            'бежевая': 'beige',
+            'бежевый': 'beige',
             'фиолетовый': 'violet',
             'голубой': 'light blue',
             'бирюзовый': 'turquoise',
@@ -133,6 +133,8 @@ class ColorSerializer(serializers.ModelSerializer):
             'малахитовый': 'malachite',
             'медный': 'copper',
             'слоновая кость': 'ivory',
+            'золотой': 'gold ',
+            'серебристый': 'silver',
         }
 
         # Проверяем, есть ли значение
@@ -148,7 +150,7 @@ class ColorSerializer(serializers.ModelSerializer):
 
         # Словарь для перевода значений на английский
         translation = {
-              'белый': 'white',
+            'белый': 'white',
             'черный': 'black',
             'красный': 'red',
             'синий': 'blue',
@@ -159,7 +161,7 @@ class ColorSerializer(serializers.ModelSerializer):
             'розовый': 'pink',
             'серый': 'gray',
             'коричневый': 'brown',
-            'бежевая': 'beige',
+            'бежевый': 'beige',
             'фиолетовый': 'violet',
             'голубой': 'light blue',
             'бирюзовый': 'turquoise',
@@ -171,6 +173,9 @@ class ColorSerializer(serializers.ModelSerializer):
             'малахитовый': 'malachite',
             'медный': 'copper',
             'слоновая кость': 'ivory',
+            'золотой': 'gold ',
+            'серебристый': 'silver',
+
         }
 
         # Присваиваем value на основе label
