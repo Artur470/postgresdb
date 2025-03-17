@@ -462,7 +462,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     brand = serializers.SlugRelatedField(queryset=Brand.objects.all(), slug_field='value', required=True)
     category = serializers.SlugRelatedField(queryset=Category.objects.all(), slug_field='value', required=True)
     color = serializers.SlugRelatedField(queryset=Color.objects.all(), slug_field='value', required=True)
-
+    promotion = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
     class Meta:
         model = Product
         fields = [
@@ -487,7 +487,12 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'main_characteristics',
         ]
 
+
     def create(self, validated_data):
+        # Убедимся, что если promotion не передано, установим его в 0
+        promotion = validated_data.get('promotion', 0)  # Если promotion не указано, установим 0
+        validated_data['promotion'] = promotion  # Явно записываем значение promotion
+
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
@@ -508,6 +513,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         return product
 
     def update(self, instance, validated_data):
+        # Проверяем и устанавливаем значение promotion, если оно не передано
+        promotion = validated_data.get('promotion', 0)  # Если promotion не указано, установим 0
+        validated_data['promotion'] = promotion  # Явно записываем значение promotion
+
         characteristics_data = validated_data.pop('main_characteristics', [])
         images_data = {key: validated_data.pop(key, None) for key in ['image1', 'image2', 'image3', 'image4', 'image5']}
 
@@ -566,7 +575,6 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
         product.main_characteristics = [{"label": label, "value": value} for label, value in characteristics_dict.items()]
         product.save()
-
 
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
